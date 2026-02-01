@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { collection, getDocs, query, where, limit } from "firebase/firestore";
 import { useFirestore, useCollection } from '@/firebase';
-import { notFound, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart } from 'lucide-react';
@@ -143,7 +143,13 @@ export default function StorePage() {
     }
 
     if (!store) {
-        notFound();
+        return (
+            <div className="flex h-screen flex-col items-center justify-center gap-4">
+                <h1 className="text-2xl font-bold">Tienda no encontrada</h1>
+                <p className="text-muted-foreground">No existe una tienda con el slug <strong>{storeSlug}</strong>.</p>
+                <p className="text-muted-foreground">Si acabás de crearla, debería aparecer inmediatamente. Si no, comprobá la URL o creá la tienda desde el panel de administración.</p>
+            </div>
+        );
     }
 
     const isLoadingMenu = loadingCategories || loadingProducts;
