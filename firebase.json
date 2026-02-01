@@ -11,6 +11,14 @@
     ],
     "rewrites": [
       {
+        "source": "/store/**",
+        "destination": "/store.html"
+      },
+      {
+        "source": "/admin/store/**",
+        "destination": "/admin/store.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

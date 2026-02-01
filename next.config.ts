@@ -2,7 +2,6 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
-  output: 'export', // Exporta la app a archivos estáticos (SPA)
   images: {
     unoptimized: true, // Desactiva la optimización de Next.js, Cloudinary se encargará de ello.
   },

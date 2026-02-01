@@ -1,0 +1,196 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user account.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The user's full name."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        }
+      },
+      "required": [
+        "name",
+        "email"
+      ]
+    },
+    "Store": {
+      "title": "Store",
+      "type": "object",
+      "description": "Represents a store or business using the platform.",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "The UID of the user who owns the store."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the store."
+        },
+        "slug": {
+          "type": "string",
+          "description": "A URL-friendly version of the store name."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Contact phone number (WhatsApp) for the store."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The timestamp when the store was created."
+        },
+        "bannerUrl": {
+          "type": "string",
+          "description": "URL for the store's banner image."
+        },
+        "bannerPublicId": {
+          "type": "string",
+          "description": "Public ID for the store's banner image in Cloudinary."
+        }
+      },
+      "required": [
+        "ownerId",
+        "name",
+        "slug",
+        "phone",
+        "createdAt"
+      ]
+    },
+    "Category": {
+      "title": "Category",
+      "type": "object",
+      "description": "Represents a category of products in a store.",
+      "properties": {
+        "storeId": {
+          "type": "string",
+          "description": "The ID of the store this category belongs to."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the category."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL of the category image."
+        },
+        "imagePublicId": {
+          "type": "string",
+          "description": "The Public ID of the image in Cloudinary."
+        }
+      },
+      "required": [
+        "storeId",
+        "name"
+      ]
+    },
+    "Product": {
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a product in a store.",
+      "properties": {
+        "storeId": {
+          "type": "string",
+          "description": "The ID of the store this product belongs to."
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "The ID of the category this product belongs to."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the product."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the product."
+        },
+        "price": {
+          "type": "number",
+          "description": "The price of the product."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL of the product image from Cloudinary."
+        },
+        "imagePublicId": {
+          "type": "string",
+          "description": "The Public ID of the image in Cloudinary."
+        },
+        "variants": {
+          "type": "array",
+          "description": "List of variants for the product (e.g., size, color).",
+          "items": {
+            "$ref": "#/entities/ProductVariant"
+          }
+        }
+      },
+      "required": [
+        "storeId",
+        "categoryId",
+        "name",
+        "price"
+      ]
+    },
+    "ProductVariant": {
+      "title": "Product Variant",
+      "type": "object",
+      "description": "Represents a group of selectable options for a product.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name of the variant group (e.g., 'Size', 'Extras')."
+        },
+        "options": {
+          "type": "array",
+          "description": "The list of choices for this variant (e.g., ['Small', 'Medium', 'Large']).",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "options"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "google.com"
+    ]
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "Stores user profile information. The `userId` is the same as the Firebase Auth UID."
+    },
+    "/stores/{storeId}": {
+      "schema": {
+        "$ref": "#/entities/Store"
+      },
+      "description": "Stores information about each individual store."
+    },
+    "/stores/{storeId}/categories/{categoryId}": {
+      "schema": {
+        "$ref": "#/entities/Category"
+      },
+      "description": "Stores product categories for a specific store."
+    },
+    "/stores/{storeId}/products/{productId}": {
+      "schema": {
+        "$ref": "#/entities/Product"
+      },
+      "description": "Stores products for a specific store."
+    }
+  }
+}
