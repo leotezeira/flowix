@@ -7,9 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { ShoppingCart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { ProductOrderDialog } from './product-order-dialog';
 import { CartSheet } from './cart-sheet';
 import Image from 'next/image';
+import type { VariantGroup, VariantSelection } from '@/types/variants';
+import { SimpleVariantSelector } from '@/components/products/simplified-selector';
 
 export type Store = {
     id: string;
@@ -17,17 +18,19 @@ export type Store = {
     slug: string;
     phone: string;
     bannerUrl?: string;
+    deliveryEnabled?: boolean;
+    deliveryFee?: number;
+    subscription?: {
+        status?: 'active' | 'past_due' | 'canceled' | 'trialing' | 'expired';
+        trialEndsAt?: any;
+    };
 }
 
 export type Category = {
     id: string;
     name: string;
     imageUrl?: string;
-}
-
-export type ProductVariant = {
-  name: string;
-  options: string[];
+    order?: number;
 }
 
 export type Product = {
@@ -37,13 +40,16 @@ export type Product = {
     price: number;
     categoryId: string;
     imageUrl?: string;
-    variants?: ProductVariant[];
+    basePrice?: number;
+    stock?: number;
+    order?: number;
+    variants?: VariantGroup[];
 }
 
 export type CartItem = {
   product: Product;
   quantity: number;
-  selectedVariants: Record<string, string>;
+  selectedVariants?: VariantSelection;
   totalPrice: number;
 }
 
@@ -56,8 +62,9 @@ export default function StorePage() {
     const [store, setStore] = useState<Store | null>(null);
     const [loadingStore, setLoadingStore] = useState(true);
     const [cart, setCart] = useState<CartItem[]>([]);
-    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [isCartOpen, setIsCartOpen] = useState(false);
+    const [showVariantSelector, setShowVariantSelector] = useState(false);
+    const [variantSelectorPending, setVariantSelectorPending] = useState<{ product: Product; quantity: number } | null>(null);
 
     useEffect(() => {
         if (pathname) {
@@ -100,13 +107,20 @@ export default function StorePage() {
     }, [firestore, store?.id]);
     const { data: products, isLoading: loadingProducts } = useCollection<Product>(productsQuery);
 
+    const sortedCategories = useMemo(() => {
+        if (!categories) return [];
+        return [...categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    }, [categories]);
+
     const productsByCategory = useMemo(() => {
-        if (!products || !categories) return {};
-        return categories.reduce((acc, category) => {
-            acc[category.id] = products.filter(p => p.categoryId === category.id);
+        if (!products || !sortedCategories) return {};
+        return sortedCategories.reduce((acc, category) => {
+            acc[category.id] = [...products.filter(p => p.categoryId === category.id)].sort(
+                (a, b) => (a.order ?? 0) - (b.order ?? 0)
+            );
             return acc;
         }, {} as Record<string, Product[]>);
-    }, [products, categories]);
+    }, [products, sortedCategories]);
 
     const handleAddToCart = (item: CartItem) => {
         setCart(currentCart => {
@@ -125,8 +139,53 @@ export default function StorePage() {
                 return [...currentCart, item];
             }
         });
-        setSelectedProduct(null); // Close dialog on add
+        // no-op
+        setShowVariantSelector(false);
         toast({ title: "Producto agregado", description: `${item.product.name} fue añadido a tu pedido.` });
+    };
+
+    const handleSelectProduct = (product: Product) => {
+        // Si el producto tiene variantes, mostrar el selector
+        if (product.variants && product.variants.length > 0) {
+            setVariantSelectorPending({ product, quantity: 1 });
+            setShowVariantSelector(true);
+        } else {
+            // Si no tiene variantes, agregar directamente al carrito
+            handleAddToCart({
+                product,
+                quantity: 1,
+                selectedVariants: {},
+                totalPrice: product.price || product.basePrice || 0,
+            });
+        }
+    };
+
+    const handleVariantSelection = (selections: VariantSelection) => {
+        if (!variantSelectorPending) return;
+        
+        // Calcular el precio con los modificadores
+        let totalPrice = variantSelectorPending.product.price || variantSelectorPending.product.basePrice || 0;
+        
+        for (const [groupId, optionIds] of Object.entries(selections)) {
+            const group = variantSelectorPending.product.variants?.find(g => g.id === groupId);
+            if (group) {
+                for (const optionId of (Array.isArray(optionIds) ? optionIds : [optionIds])) {
+                    const option = group.options.find(o => o.id === optionId);
+                    if (option?.priceModifier) {
+                        totalPrice += option.priceModifier;
+                    }
+                }
+            }
+        }
+
+        handleAddToCart({
+            product: variantSelectorPending.product,
+            quantity: variantSelectorPending.quantity,
+            selectedVariants: selections,
+            totalPrice,
+        });
+
+        setVariantSelectorPending(null);
     };
 
      const handleCartChange = (newCart: CartItem[]) => {
@@ -148,6 +207,29 @@ export default function StorePage() {
                 <h1 className="text-2xl font-bold">Tienda no encontrada</h1>
                 <p className="text-muted-foreground">No existe una tienda con el slug <strong>{storeSlug}</strong>.</p>
                 <p className="text-muted-foreground">Si acabás de crearla, debería aparecer inmediatamente. Si no, comprobá la URL o creá la tienda desde el panel de administración.</p>
+            </div>
+        );
+    }
+
+    const resolveMillis = (value: any) => {
+        if (!value) return undefined;
+        if (typeof value === 'number') return value;
+        if (typeof value?.toMillis === 'function') return value.toMillis();
+        const parsed = Date.parse(value);
+        return Number.isNaN(parsed) ? undefined : parsed;
+    };
+
+    const trialEndsAt = resolveMillis(store.subscription?.trialEndsAt);
+    const isSubscriptionActive =
+        store.subscription?.status === 'active' ||
+        (store.subscription?.status === 'trialing' && trialEndsAt && Date.now() < trialEndsAt) ||
+        (!store.subscription && true);
+
+    if (!isSubscriptionActive) {
+        return (
+            <div className="flex h-screen flex-col items-center justify-center gap-4 text-center">
+                <h1 className="text-2xl font-bold">Tienda no disponible por el momento</h1>
+                <p className="text-muted-foreground">La suscripción de esta tienda venció.</p>
             </div>
         );
     }
@@ -189,15 +271,15 @@ export default function StorePage() {
 
                 {isLoadingMenu ? (
                      <div className="text-center">Cargando menú...</div>
-                ) : categories && categories.length > 0 ? (
+                ) : sortedCategories && sortedCategories.length > 0 ? (
                     <div className="space-y-12">
-                        {categories.map(category => (
+                        {sortedCategories.map(category => (
                             (productsByCategory[category.id] && productsByCategory[category.id].length > 0) && (
                                 <section key={category.id}>
                                     <h2 className="text-3xl font-bold mb-6">{category.name}</h2>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                         {productsByCategory[category.id].map(product => (
-                                            <Card key={product.id} className="flex flex-col overflow-hidden transition-shadow duration-300 hover:shadow-lg cursor-pointer" onClick={() => setSelectedProduct(product)}>
+                                            <Card key={product.id} className={`flex flex-col overflow-hidden transition-shadow duration-300 hover:shadow-lg ${((product.stock ?? 0) <= 0) ? 'opacity-70' : ''}`}>
                                                 {product.imageUrl && (
                                                     <div className="relative aspect-video w-full">
                                                         <Image src={product.imageUrl} alt={product.name} fill className="object-cover" />
@@ -211,9 +293,16 @@ export default function StorePage() {
                                                         {product.description && <p className="text-muted-foreground mb-4 text-sm">{product.description}</p>}
                                                     </CardContent>
                                                     <CardFooter className="p-0 pt-4 flex items-center justify-between">
-                                                        <p className="text-xl font-semibold">${product.price.toFixed(2)}</p>
-                                                        <Button>
-                                                            Agregar
+                                                        <p className="text-xl font-semibold">${(product.basePrice || product.price).toFixed(2)}</p>
+                                                        <Button
+                                                            disabled={(product.stock ?? 0) <= 0}
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleSelectProduct(product);
+                                                            }}
+                                                        >
+                                                            <ShoppingCart className="mr-2 h-4 w-4" />
+                                                            {(product.stock ?? 0) <= 0 ? 'Sin stock' : 'Agregar'}
                                                         </Button>
                                                     </CardFooter>
                                                 </div>
@@ -232,15 +321,6 @@ export default function StorePage() {
                 )}
             </main>
 
-            {selectedProduct && (
-                <ProductOrderDialog 
-                    product={selectedProduct}
-                    isOpen={!!selectedProduct}
-                    onOpenChange={(open) => !open && setSelectedProduct(null)}
-                    onAddToCart={handleAddToCart}
-                />
-            )}
-
             {store && (
                 <CartSheet
                     cart={cart}
@@ -248,6 +328,15 @@ export default function StorePage() {
                     isOpen={isCartOpen}
                     onOpenChange={setIsCartOpen}
                     onCartChange={handleCartChange}
+                />
+            )}
+
+            {variantSelectorPending && (
+                <SimpleVariantSelector
+                    product={variantSelectorPending.product as any}
+                    open={showVariantSelector}
+                    onOpenChange={setShowVariantSelector}
+                    onConfirm={handleVariantSelection}
                 />
             )}
         </div>

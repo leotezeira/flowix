@@ -14,6 +14,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { ShoppingCart, Trash2 } from 'lucide-react';
 import type { CartItem, Store } from './StoreClient';
+import { useFirestore } from '@/firebase';
+import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
 
 interface CartSheetProps {
     cart: CartItem[];
@@ -39,16 +41,20 @@ const checkoutFormSchema = z.object({
 });
 
 export function CartSheet({ cart, store, isOpen, onOpenChange, onCartChange }: CartSheetProps) {
+    const firestore = useFirestore();
     const form = useForm<z.infer<typeof checkoutFormSchema>>({
         resolver: zodResolver(checkoutFormSchema),
         defaultValues: { name: "", deliveryMethod: "pickup", address: "", phone: "" },
     });
 
     const deliveryMethod = form.watch('deliveryMethod');
+    const deliveryAvailable = store?.deliveryEnabled ?? false;
+    const deliveryFee = deliveryMethod === 'delivery' ? (store?.deliveryFee || 0) : 0;
 
     const total = useMemo(() => {
         return cart.reduce((acc, item) => acc + item.totalPrice, 0);
     }, [cart]);
+    const totalWithDelivery = total + deliveryFee;
 
     const handleRemoveItem = (index: number) => {
         const newCart = [...cart];
@@ -56,18 +62,65 @@ export function CartSheet({ cart, store, isOpen, onOpenChange, onCartChange }: C
         onCartChange(newCart);
     };
 
-    function onSubmit(values: z.infer<typeof checkoutFormSchema>) {
+    async function persistOrder(values: z.infer<typeof checkoutFormSchema>) {
+        if (!firestore || !store?.id) return;
+
+        const orderItems = cart.map((item) => ({
+            productId: item.product.id,
+            name: item.product.name,
+            quantity: item.quantity,
+            totalPrice: item.totalPrice,
+            variants: item.selectedVariants || {},
+        }));
+
+        await addDoc(collection(firestore, 'stores', store.id, 'orders'), {
+            createdAt: serverTimestamp(),
+            status: 'new',
+            customerName: values.name,
+            customerPhone: values.phone,
+            deliveryMethod: values.deliveryMethod,
+            address: values.deliveryMethod === 'delivery' ? values.address || '' : '',
+            deliveryFee,
+            total: totalWithDelivery,
+            items: orderItems,
+        });
+
+        const customerId = values.phone.replace(/\D/g, '') || values.phone;
+        await setDoc(
+            doc(firestore, 'stores', store.id, 'customers', customerId),
+            {
+                name: values.name,
+                phone: values.phone,
+                updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+        );
+    }
+
+    async function onSubmit(values: z.infer<typeof checkoutFormSchema>) {
         if (!store?.phone) return;
+
+        try {
+            await persistOrder(values);
+        } catch (error) {
+            console.error('Error guardando el pedido:', error);
+        }
 
         let orderSummary = "¡Hola! Quisiera hacer el siguiente pedido:\n\n";
         cart.forEach(item => {
             orderSummary += `*${item.quantity}x ${item.product.name}* - $${item.totalPrice.toFixed(2)}\n`;
-            Object.entries(item.selectedVariants).forEach(([variant, option]) => {
-                orderSummary += `  - ${variant}: ${option}\n`;
+            Object.entries(item.selectedVariants || {}).forEach(([variant, options]) => {
+                const optionList = Array.isArray(options) ? options : [options];
+                optionList.forEach((option) => {
+                    orderSummary += `  - ${variant}: ${option}\n`;
+                });
             });
             orderSummary += '\n';
         });
-        orderSummary += `*Total: $${total.toFixed(2)}*\n\n`;
+        if (deliveryFee > 0) {
+            orderSummary += `*Envío: $${deliveryFee.toFixed(2)}*\n`;
+        }
+        orderSummary += `*Total: $${totalWithDelivery.toFixed(2)}*\n\n`;
 
         orderSummary += "Mis datos:\n";
         orderSummary += `- Nombre: ${values.name}\n`;
@@ -99,9 +152,12 @@ export function CartSheet({ cart, store, isOpen, onOpenChange, onCartChange }: C
                                     <div className="flex-grow">
                                         <p className="font-semibold">{item.quantity}x {item.product.name}</p>
                                         <div className="text-sm text-muted-foreground">
-                                            {Object.entries(item.selectedVariants).map(([variant, option]) => (
-                                                <p key={variant}>{variant}: {option}</p>
-                                            ))}
+                                            {Object.entries(item.selectedVariants || {}).map(([variant, options]) => {
+                                                const optionList = Array.isArray(options) ? options : [options];
+                                                return optionList.map((option) => (
+                                                    <p key={`${variant}-${option}`}>{variant}: {option}</p>
+                                                ));
+                                            })}
                                         </div>
                                     </div>
                                     <div className="flex flex-col items-end justify-between">
@@ -115,9 +171,15 @@ export function CartSheet({ cart, store, isOpen, onOpenChange, onCartChange }: C
                         </div>
 
                         <div className="px-6 mt-4">
+                            {deliveryFee > 0 && (
+                                <div className="flex justify-between text-sm text-muted-foreground mt-4">
+                                    <span>Envío</span>
+                                    <span>${deliveryFee.toFixed(2)}</span>
+                                </div>
+                            )}
                             <div className="flex justify-between font-bold text-lg my-4">
                                 <span>Total</span>
-                                <span>${total.toFixed(2)}</span>
+                                <span>${totalWithDelivery.toFixed(2)}</span>
                             </div>
                             <Separator />
                             <Form {...form}>
@@ -136,8 +198,12 @@ export function CartSheet({ cart, store, isOpen, onOpenChange, onCartChange }: C
                                                     <FormLabel className="font-normal">Retiro en el local</FormLabel>
                                                 </FormItem>
                                                 <FormItem className="flex items-center space-x-3 space-y-0">
-                                                    <FormControl><RadioGroupItem value="delivery" /></FormControl>
-                                                    <FormLabel className="font-normal">Envío a domicilio</FormLabel>
+                                                    <FormControl>
+                                                        <RadioGroupItem value="delivery" disabled={!deliveryAvailable} />
+                                                    </FormControl>
+                                                    <FormLabel className={`font-normal ${!deliveryAvailable ? 'text-muted-foreground' : ''}`}>
+                                                        Envío a domicilio
+                                                    </FormLabel>
                                                 </FormItem>
                                             </RadioGroup>
                                         </FormControl><FormMessage /></FormItem>

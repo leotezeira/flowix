@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore } from '@/firebase';
-import { collection, query, where, getDocs, limit, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -76,6 +76,17 @@ export default function AdminHubPage() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user || !firestore) return;
 
+    // Verificar que el email esté verificado antes de crear la tienda
+    if (!user.emailVerified) {
+      toast({
+        variant: "destructive",
+        title: "Email no verificado",
+        description: "Necesitás verificar tu email antes de crear una tienda.",
+      });
+      router.push('/verify-email');
+      return;
+    }
+
     try {
       const storeSlug = slugify(values.storeName);
 
@@ -87,9 +98,16 @@ export default function AdminHubPage() {
         createdAt: serverTimestamp(),
       });
 
+      // Actualizar el documento del usuario para registrar el inicio del período de prueba
+      const userRef = doc(firestore, "users", user.uid);
+      await updateDoc(userRef, {
+        trialStartedAt: serverTimestamp(),
+        storeId: storeRef.id,
+      });
+
       toast({
         title: "¡Tienda creada!",
-        description: "Tu tienda ha sido creada con éxito.",
+        description: "Tu tienda ha sido creada con éxito. Iniciaste tu período de prueba gratuito.",
       });
 
       router.push(`/admin/store/${storeSlug}`);

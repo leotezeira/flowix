@@ -1,14 +1,15 @@
 'use client';
 import { useState, useMemo, useEffect } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useFirestore, useCollection } from '@/firebase';
 import { collection, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,6 +20,8 @@ import type { Category } from './categories-manager';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import Image from 'next/image';
+import { VariantManager } from '@/components/products/variant-manager';
+import type { VariantGroup } from '@/types/variants';
 
 type Product = {
   id: string;
@@ -28,20 +31,19 @@ type Product = {
   description?: string;
   imageUrl?: string;
   imagePublicId?: string;
-  variants?: { name: string; options: string[] }[];
+  stock?: number;
+  order?: number;
+  variants?: VariantGroup[];
 };
 
 const productFormSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
   description: z.string().optional(),
   price: z.coerce.number().min(0, 'El precio no puede ser negativo'),
+  stock: z.coerce.number().min(0, 'El stock no puede ser negativo').optional(),
+  order: z.coerce.number().min(0, 'El orden no puede ser negativo').optional(),
   categoryId: z.string().min(1, 'Debes seleccionar una categoría'),
-  variants: z.array(
-    z.object({
-      name: z.string().min(1, 'Nombre de variante requerido'),
-      options: z.string().min(1, 'Opciones requeridas'),
-    })
-  ).optional(),
+  variants: z.array(z.any()).optional(),
 });
 
 type ProductFormValues = z.infer<typeof productFormSchema>;
@@ -49,20 +51,39 @@ type ProductFormValues = z.infer<typeof productFormSchema>;
 
 /**
  * Sube una imagen a Cloudinary usando un "upload preset" sin firma (unsigned).
- * Este método es seguro para ser llamado desde el cliente porque no requiere `api_key` ni `api_secret`.
- * La autenticación se maneja a través del 'upload_preset' configurado como 'unsigned' en tu cuenta de Cloudinary.
- * Esto elimina la necesidad de tener un backend para firmar las solicitudes o de manejar claves secretas.
- * @param file El archivo a subir.
- * @param storeId El ID de la tienda para organizar los archivos en carpetas.
- * @returns Una promesa que resuelve a la URL segura y el public_id de la imagen.
+ * IMPORTANTE: Este código se ejecuta ÚNICAMENTE dentro de handlers de evento (onClick, onSubmit).
+ * No se ejecuta durante render, build ni en Server Components.
  */
 const uploadImageToCloudinary = async (file: File, storeId: string): Promise<{ secure_url: string; public_id: string }> => {
+  // Validar variables SOLO dentro del handler de evento
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET?.trim();
+
+  // Log de debug SOLO en handler
+  console.log('[Cloudinary Upload] cloud_name:', cloudName);
+  console.log('[Cloudinary Upload] upload_preset:', uploadPreset);
+
+  if (!cloudName || cloudName === '') {
+    throw new Error('❌ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME está vacío o undefined en runtime');
+  }
+
+  if (!uploadPreset || uploadPreset === '') {
+    throw new Error('❌ NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET está vacío o undefined en runtime');
+  }
+
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'products_unsigned');
+  formData.append('upload_preset', uploadPreset);
   formData.append('folder', `stores/${storeId}/products`);
 
-  const response = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`, {
+  const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+  console.log('[Cloudinary Upload] URL:', uploadUrl);
+  console.log('[Cloudinary Upload] FormData entries:');
+  for (const [key, value] of formData.entries()) {
+    console.log(`  ${key}:`, value instanceof File ? `File(${value.name})` : value);
+  }
+
+  const response = await fetch(uploadUrl, {
     method: 'POST',
     body: formData,
   });
@@ -91,6 +112,8 @@ export function ProductsManager({ storeId }: { storeId:string }) {
     const [isDeleting, setIsDeleting] = useState(false);
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [variants, setVariants] = useState<VariantGroup[]>([]);
+    const [resizeImage, setResizeImage] = useState(true);
     
     const categoriesQuery = useMemo(() => {
         if (!firestore) return null;
@@ -106,12 +129,7 @@ export function ProductsManager({ storeId }: { storeId:string }) {
 
     const createForm = useForm<ProductFormValues>({
         resolver: zodResolver(productFormSchema),
-        defaultValues: { name: '', description: '', price: 0, categoryId: '', variants: [] },
-    });
-
-    const { fields, append, remove } = useFieldArray({
-        control: createForm.control,
-        name: "variants",
+      defaultValues: { name: '', description: '', price: 0, stock: 0, order: 0, categoryId: '', variants: [] },
     });
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -137,6 +155,35 @@ export function ProductsManager({ storeId }: { storeId:string }) {
         if(fileInput) fileInput.value = '';
     }
 
+    const resizeImageFile = async (file: File, maxSize = 1200): Promise<File> => {
+      const image = new Image();
+      const url = URL.createObjectURL(file);
+      await new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = reject;
+        image.src = url;
+      });
+
+      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+      const width = Math.round(image.width * scale);
+      const height = Math.round(image.height * scale);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return file;
+      ctx.drawImage(image, 0, 0, width, height);
+
+      const blob: Blob | null = await new Promise((resolve) =>
+        canvas.toBlob((b) => resolve(b), file.type, 0.9)
+      );
+
+      URL.revokeObjectURL(url);
+      if (!blob) return file;
+      return new File([blob], file.name, { type: file.type });
+    };
+
     async function onCreateSubmit(values: ProductFormValues) {
         if (!firestore || !productsQuery) {
             toast({ variant: 'destructive', title: 'Error', description: 'Servicios de Firebase no disponibles.' });
@@ -146,18 +193,15 @@ export function ProductsManager({ storeId }: { storeId:string }) {
         toast({ title: 'Guardando producto...' });
 
         try {
-            const variantsToSave = values.variants?.map(v => ({
-                name: v.name,
-                options: v.options.split(',').map(o => o.trim()).filter(Boolean),
-            })).filter(v => v.options.length > 0) || [];
-
             const productData = {
                 storeId,
                 name: values.name,
                 description: values.description,
                 price: values.price,
+              stock: values.stock || 0,
+              order: values.order || 0,
                 categoryId: values.categoryId,
-                variants: variantsToSave,
+                variants: variants,
             };
             
             const newDocRef = await addDoc(productsQuery, productData);
@@ -165,7 +209,7 @@ export function ProductsManager({ storeId }: { storeId:string }) {
             
             if (imageFile) {
                 toast({ title: 'Subiendo imagen...', description: 'Esto puede tardar un momento.' });
-                const fileToUpload = imageFile;
+              const fileToUpload = resizeImage ? await resizeImageFile(imageFile) : imageFile;
                 const docId = newDocRef.id;
 
                 // Subida en segundo plano
@@ -186,7 +230,7 @@ export function ProductsManager({ storeId }: { storeId:string }) {
 
             createForm.reset();
             clearImage();
-            remove();
+            setVariants([]);
 
         } catch (error) {
             console.error('Error creating product:', error);
@@ -263,12 +307,20 @@ export function ProductsManager({ storeId }: { storeId:string }) {
                                 />
                                 <FormField control={createForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Nombre del producto</FormLabel> <FormControl><Input placeholder="Ej: Hamburguesa Clásica" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                                 <FormField control={createForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Descripción (opcional)</FormLabel> <FormControl><Textarea placeholder="Ej: Medallón de 180g, queso cheddar, panceta, etc." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-                                <FormField control={createForm.control} name="price" render={({ field }) => ( <FormItem> <FormLabel>Precio</FormLabel> <FormControl><Input type="number" step="0.01" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                <FormField control={createForm.control} name="price" render={({ field }) => ( <FormItem> <FormLabel>Precio base</FormLabel> <FormControl><Input type="number" step="0.01" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                  <FormField control={createForm.control} name="stock" render={({ field }) => ( <FormItem> <FormLabel>Stock</FormLabel> <FormControl><Input type="number" min={0} step="1" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                  <FormField control={createForm.control} name="order" render={({ field }) => ( <FormItem> <FormLabel>Orden</FormLabel> <FormControl><Input type="number" min={0} step="1" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                </div>
                                 <FormItem>
                                     <FormLabel>Imagen (Opcional)</FormLabel>
                                     <FormControl>
                                         <Input id="product-image-upload" type="file" accept="image/png, image/jpeg, image/webp" onChange={handleImageChange} />
                                     </FormControl>
+                                  <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                                    <Checkbox checked={resizeImage} onCheckedChange={(checked) => setResizeImage(Boolean(checked))} />
+                                    <span>Redimensionar al tamaño final automáticamente</span>
+                                  </div>
                                     {imagePreview && (
                                     <div className="relative mt-4 h-32 w-32">
                                         <Image src={imagePreview} alt="Vista previa" fill className="rounded-md object-cover" />
@@ -279,9 +331,10 @@ export function ProductsManager({ storeId }: { storeId:string }) {
                                     )}
                                 </FormItem>
                                 <Separator />
-                                <div> <h3 className="text-lg font-medium">Variantes de producto</h3> <p className="text-sm text-muted-foreground">Añade opciones como tamaños, gustos o extras.</p> </div>
-                                {fields.map((field, index) => ( <div key={field.id} className="flex items-end gap-2 p-3 border rounded-lg"> <div className="grid gap-2 flex-1"> <FormField control={createForm.control} name={`variants.${index}.name`} render={({ field }) => ( <FormItem> <FormLabel>Nombre de la variante</FormLabel> <FormControl> <Input placeholder="Ej: Tamaño" {...field} /> </FormControl> <FormMessage /> </FormItem> )}/> <FormField control={createForm.control} name={`variants.${index}.options`} render={({ field }) => ( <FormItem> <FormLabel>Opciones</FormLabel> <FormControl> <Input placeholder="Chico, Mediano, Grande" {...field} /> </FormControl> <FormDescription>Separar con comas.</FormDescription> <FormMessage /> </FormItem> )}/> </div> <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}> <Trash2 className="h-4 w-4" /> <span className="sr-only">Eliminar Variante</span> </Button> </div> ))}
-                                <Button type="button" variant="outline" onClick={() => append({ name: '', options: '' })}> Añadir Variante </Button>
+                                <VariantManager 
+                                  variants={variants}
+                                  onChange={setVariants}
+                                />
                                 <Separator />
                                 <Button type="submit" disabled={isSaving} className="mt-4"> {isSaving ? 'Guardando...' : 'Guardar Producto'} </Button>
                             </form>
@@ -305,6 +358,8 @@ export function ProductsManager({ storeId }: { storeId:string }) {
                                         <TableHead>Nombre</TableHead>
                                         <TableHead>Categoría</TableHead>
                                         <TableHead>Precio</TableHead>
+                                      <TableHead>Stock</TableHead>
+                                      <TableHead>Orden</TableHead>
                                         <TableHead className="text-right">Acciones</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -321,6 +376,8 @@ export function ProductsManager({ storeId }: { storeId:string }) {
                                             <TableCell className="font-medium">{prod.name}</TableCell>
                                             <TableCell>{getCategoryName(prod.categoryId)}</TableCell>
                                             <TableCell>${prod.price.toFixed(2)}</TableCell>
+                                            <TableCell>{prod.stock ?? 0}</TableCell>
+                                            <TableCell>{prod.order ?? 0}</TableCell>
                                             <TableCell className="text-right">
                                               <Button variant="ghost" size="icon" onClick={() => setEditingProduct(prod)}>
                                                 <Pencil className="h-4 w-4" />
@@ -388,14 +445,18 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
   const [isSaving, setIsSaving] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [editVariants, setEditVariants] = useState<VariantGroup[]>(product.variants || []);
+  const [resizeImage, setResizeImage] = useState(true);
 
 
   const defaultValues = useMemo(() => ({
     name: product.name || '',
     description: product.description || '',
     price: product.price || 0,
+    stock: product.stock || 0,
+    order: product.order || 0,
     categoryId: product.categoryId || '',
-    variants: product.variants?.map(v => ({ name: v.name, options: v.options.join(', ') })) || [],
+    variants: [],
   }), [product]);
 
   const editForm = useForm<ProductFormValues>({
@@ -406,13 +467,8 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
   useEffect(() => {
     editForm.reset(defaultValues);
     setImagePreview(product.imageUrl || null);
+    setEditVariants(product.variants || []);
   }, [product, defaultValues, editForm]);
-
-
-  const { fields, append, remove } = useFieldArray({
-    control: editForm.control,
-    name: 'variants',
-  });
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -437,6 +493,35 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
       if(fileInput) fileInput.value = '';
   }
 
+    const resizeImageFile = async (file: File, maxSize = 1200): Promise<File> => {
+      const image = new Image();
+      const url = URL.createObjectURL(file);
+      await new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = reject;
+        image.src = url;
+      });
+
+      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+      const width = Math.round(image.width * scale);
+      const height = Math.round(image.height * scale);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return file;
+      ctx.drawImage(image, 0, 0, width, height);
+
+      const blob: Blob | null = await new Promise((resolve) =>
+        canvas.toBlob((b) => resolve(b), file.type, 0.9)
+      );
+
+      URL.revokeObjectURL(url);
+      if (!blob) return file;
+      return new File([blob], file.name, { type: file.type });
+    };
+
 
   async function onEditSubmit(values: ProductFormValues) {
     if (!firestore) {
@@ -447,19 +532,16 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
     toast({ title: 'Actualizando producto...' });
 
     try {
-      const variantsToSave = values.variants?.map(v => ({
-        name: v.name,
-        options: v.options.split(',').map(o => o.trim()).filter(Boolean),
-      })).filter(v => v.options.length > 0) || [];
-
       const productRef = doc(firestore, 'stores', storeId, 'products', product.id);
       
       await updateDoc(productRef, {
         name: values.name,
         description: values.description,
         price: values.price,
+        stock: values.stock || 0,
+        order: values.order || 0,
         categoryId: values.categoryId,
-        variants: variantsToSave,
+        variants: editVariants,
       });
       toast({ title: 'Producto actualizado'});
 
@@ -469,7 +551,8 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
           // Si hay un archivo nuevo, subirlo y reemplazar el anterior
           if (imageFile) {
             toast({ title: 'Subiendo nueva imagen...' });
-            const { secure_url, public_id } = await uploadImageToCloudinary(imageFile, storeId);
+            const fileToUpload = resizeImage ? await resizeImageFile(imageFile) : imageFile;
+            const { secure_url, public_id } = await uploadImageToCloudinary(fileToUpload, storeId);
             
             // Ya no se elimina la imagen de Cloudinary para evitar el uso del api_secret.
             
@@ -531,12 +614,20 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
             />
             <FormField control={editForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Nombre del producto</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
             <FormField control={editForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Descripción (opcional)</FormLabel> <FormControl><Textarea {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
-            <FormField control={editForm.control} name="price" render={({ field }) => ( <FormItem> <FormLabel>Precio</FormLabel> <FormControl><Input type="number" step="0.01" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <FormField control={editForm.control} name="price" render={({ field }) => ( <FormItem> <FormLabel>Precio base</FormLabel> <FormControl><Input type="number" step="0.01" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField control={editForm.control} name="stock" render={({ field }) => ( <FormItem> <FormLabel>Stock</FormLabel> <FormControl><Input type="number" min={0} step="1" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={editForm.control} name="order" render={({ field }) => ( <FormItem> <FormLabel>Orden</FormLabel> <FormControl><Input type="number" min={0} step="1" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+            </div>
              <FormItem>
                 <FormLabel>Imagen (Opcional)</FormLabel>
                 <FormControl>
                     <Input id={`product-image-edit-${product.id}`} type="file" accept="image/png, image/jpeg, image/webp" onChange={handleImageChange} />
                 </FormControl>
+                <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                  <Checkbox checked={resizeImage} onCheckedChange={(checked) => setResizeImage(Boolean(checked))} />
+                  <span>Redimensionar al tamaño final automáticamente</span>
+                </div>
                 {imagePreview && (
                     <div className="relative mt-4 h-32 w-32">
                     <Image src={imagePreview} alt="Vista previa" fill className="rounded-md object-cover" />
@@ -547,9 +638,7 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
                 )}
             </FormItem>
             <Separator />
-            <div> <h3 className="text-lg font-medium">Variantes</h3> <p className="text-sm text-muted-foreground">Gestiona las opciones del producto.</p> </div>
-            {fields.map((field, index) => ( <div key={field.id} className="flex items-end gap-2 p-3 border rounded-lg"> <div className="grid gap-2 flex-1"> <FormField control={editForm.control} name={`variants.${index}.name`} render={({ field }) => ( <FormItem> <FormLabel>Nombre variante</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage/> </FormItem> )}/> <FormField control={editForm.control} name={`variants.${index}.options`} render={({ field }) => ( <FormItem> <FormLabel>Opciones</FormLabel> <FormControl><Input {...field} /></FormControl> <FormDescription>Separar con comas.</FormDescription> <FormMessage/> </FormItem> )}/> </div> <Button type="button" variant="destructive" size="icon" onClick={() => remove(index)}> <Trash2 className="h-4 w-4"/> </Button> </div> ))}
-            <Button type="button" variant="outline" onClick={() => append({ name: '', options: '' })}> Añadir Variante </Button>
+            <VariantManager variants={editVariants} onChange={setEditVariants} />
             
             <DialogFooter className="pt-4">
                <DialogClose asChild><Button type="button" variant="secondary" disabled={isSaving}>Cancelar</Button></DialogClose>

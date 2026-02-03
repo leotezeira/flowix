@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { FirebaseError } from "firebase/app";
 import { useAuth, useFirestore } from "@/firebase";
@@ -53,9 +53,19 @@ export default function RegisterPage() {
             await setDoc(doc(firestore, "users", user.uid), {
               name: values.name,
               email: values.email,
+              emailVerified: false,
+              createdAt: new Date().toISOString(),
             });
             
-            router.push(`/admin`);
+            // Enviar email de verificación
+            await sendEmailVerification(user);
+            
+            toast({
+              title: "Cuenta creada",
+              description: "Te enviamos un email de verificación. Por favor, revisá tu casilla.",
+            });
+            
+            router.push(`/verify-email`);
 
         } catch (error) {
             console.error("Error during registration:", error);

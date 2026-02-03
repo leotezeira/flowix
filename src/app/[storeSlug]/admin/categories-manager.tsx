@@ -21,22 +21,48 @@ export type Category = {
   name: string;
   imageUrl?: string;
   imagePublicId?: string;
+  order?: number;
 };
 
 const categoryFormSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
+  order: z.coerce.number().min(0, 'El orden no puede ser negativo').optional(),
 });
 
 type CategoryFormValues = z.infer<typeof categoryFormSchema>;
 
 // Función para subir una imagen a Cloudinary
+// IMPORTANTE: Se ejecuta ÚNICAMENTE dentro de handlers de evento (onClick, onSubmit)
 const uploadImageToCloudinary = async (file: File, storeId: string): Promise<{ secure_url: string; public_id: string }> => {
+  // Validar variables SOLO dentro del handler de evento
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
+  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET?.trim();
+
+  // Log de debug SOLO en handler
+  console.log('[Cloudinary Upload] cloud_name:', cloudName);
+  console.log('[Cloudinary Upload] upload_preset:', uploadPreset);
+
+  if (!cloudName || cloudName === '') {
+    throw new Error('❌ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME está vacío o undefined en runtime');
+  }
+
+  if (!uploadPreset || uploadPreset === '') {
+    throw new Error('❌ NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET está vacío o undefined en runtime');
+  }
+
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || 'products_unsigned');
+  formData.append('upload_preset', uploadPreset);
   formData.append('folder', `stores/${storeId}/categories`);
 
-  const response = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`, {
+  const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+  console.log('[Cloudinary Upload] URL:', uploadUrl);
+  console.log('[Cloudinary Upload] FormData entries:');
+  for (const [key, value] of formData.entries()) {
+    console.log(`  ${key}:`, value instanceof File ? `File(${value.name})` : value);
+  }
+
+  const response = await fetch(uploadUrl, {
     method: 'POST',
     body: formData,
   });
@@ -73,10 +99,14 @@ export function CategoriesManager({ storeId }: { storeId: string }) {
   }, [firestore, storeId]);
 
   const { data: categories, isLoading } = useCollection<Category>(categoriesQuery);
+  const sortedCategories = useMemo(() => {
+    if (!categories) return [];
+    return [...categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  }, [categories]);
 
   const createForm = useForm<CategoryFormValues>({
     resolver: zodResolver(categoryFormSchema),
-    defaultValues: { name: '' },
+    defaultValues: { name: '', order: 0 },
   });
   
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -112,7 +142,7 @@ export function CategoriesManager({ storeId }: { storeId: string }) {
     toast({ title: 'Guardando categoría...' });
 
     try {
-      const categoryData = { storeId, name: values.name };
+      const categoryData = { storeId, name: values.name, order: values.order || 0 };
       const newDocRef = await addDoc(categoriesQuery, categoryData);
       
       toast({ title: 'Categoría guardada', description: 'Los datos se guardaron correctamente.' });
@@ -196,6 +226,19 @@ export function CategoriesManager({ storeId }: { storeId: string }) {
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={createForm.control}
+                    name="order"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Orden</FormLabel>
+                        <FormControl>
+                          <Input type="number" min={0} step="1" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                    <FormItem>
                       <FormLabel>Imagen (Opcional)</FormLabel>
                       <FormControl>
@@ -226,17 +269,18 @@ export function CategoriesManager({ storeId }: { storeId: string }) {
             <CardContent>
               {isLoading ? (
                 <p>Cargando categorías...</p>
-              ) : categories && categories.length > 0 ? (
+              ) : sortedCategories && sortedCategories.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Imagen</TableHead>
                       <TableHead>Nombre</TableHead>
+                      <TableHead>Orden</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {categories.map((cat) => (
+                    {sortedCategories.map((cat) => (
                       <TableRow key={cat.id}>
                          <TableCell>
                             {cat.imageUrl ? (
@@ -246,6 +290,7 @@ export function CategoriesManager({ storeId }: { storeId: string }) {
                             )}
                          </TableCell>
                         <TableCell>{cat.name}</TableCell>
+                        <TableCell>{cat.order ?? 0}</TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="icon" onClick={() => setEditingCategory(cat)}>
                             <Pencil className="h-4 w-4" />
@@ -314,7 +359,7 @@ function CategoryEditDialog({ category, storeId, onOpenChange, onCategoryUpdated
 
   const editForm = useForm<CategoryFormValues>({
     resolver: zodResolver(categoryFormSchema),
-    defaultValues: { name: category.name || '' },
+    defaultValues: { name: category.name || '', order: category.order || 0 },
   });
 
    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -352,7 +397,7 @@ function CategoryEditDialog({ category, storeId, onOpenChange, onCategoryUpdated
     try {
       const categoryRef = doc(firestore, 'stores', storeId, 'categories', category.id);
       
-      await updateDoc(categoryRef, { name: values.name });
+      await updateDoc(categoryRef, { name: values.name, order: values.order || 0 });
       toast({ title: 'Categoría actualizada'});
       
       // Lógica para manejar la imagen en segundo plano
@@ -407,6 +452,19 @@ function CategoryEditDialog({ category, storeId, onOpenChange, onCategoryUpdated
                   <FormLabel>Nombre</FormLabel>
                   <FormControl>
                     <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={editForm.control}
+              name="order"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Orden</FormLabel>
+                  <FormControl>
+                    <Input type="number" min={0} step="1" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -11,27 +11,20 @@ import { Trash2, Image as ImageIcon } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 
-interface BannerManagerProps {
+interface LogoManagerProps {
     storeId: string;
 }
 
 type Store = {
     id: string;
-    bannerUrl?: string;
-    bannerPublicId?: string;
-}
+    logoUrl?: string;
+    logoPublicId?: string;
+};
 
-/**
- * Sube una imagen a Cloudinary usando un "upload preset" sin firma.
- * IMPORTANTE: Este código se ejecuta ÚNICAMENTE dentro de handlers de evento (onClick, onSubmit).
- * No se ejecuta durante render, build ni en Server Components.
- */
 const uploadImageToCloudinary = async (file: File, storeId: string): Promise<{ secure_url: string; public_id: string }> => {
-    // Validar variables SOLO dentro del handler de evento
     const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
     const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET?.trim();
 
-    // Log de debug SOLO en handler
     console.log('[Cloudinary Upload] cloud_name:', cloudName);
     console.log('[Cloudinary Upload] upload_preset:', uploadPreset);
 
@@ -46,7 +39,7 @@ const uploadImageToCloudinary = async (file: File, storeId: string): Promise<{ s
     const formData = new FormData();
     formData.append('file', file);
     formData.append('upload_preset', uploadPreset);
-    formData.append('folder', `stores/${storeId}/banner`);
+    formData.append('folder', `stores/${storeId}/logo`);
 
     const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
     console.log('[Cloudinary Upload] URL:', uploadUrl);
@@ -74,8 +67,7 @@ const uploadImageToCloudinary = async (file: File, storeId: string): Promise<{ s
     return { secure_url: data.secure_url, public_id: data.public_id };
 };
 
-
-export function BannerManager({ storeId }: BannerManagerProps) {
+export function LogoManager({ storeId }: LogoManagerProps) {
     const firestore = useFirestore();
     const { toast } = useToast();
 
@@ -93,20 +85,19 @@ export function BannerManager({ storeId }: BannerManagerProps) {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     
     useEffect(() => {
-        if (store && !imageFile) { // only update preview from store if no local file is selected
-            setImagePreview(store.bannerUrl || null);
+        if (store && !imageFile) {
+            setImagePreview(store.logoUrl || null);
         }
     }, [store, imageFile]);
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            // Validación de tipo y tamaño
             if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
                 toast({ variant: 'destructive', title: 'Error', description: 'Tipo de archivo no válido. Solo se permiten JPG, PNG y WEBP.' });
                 return;
             }
-            if (file.size > 5 * 1024 * 1024) { // Límite de 5MB
+            if (file.size > 5 * 1024 * 1024) {
                 toast({ variant: 'destructive', title: 'Error', description: 'El archivo es demasiado grande. El límite es 5MB.' });
                 return;
             }
@@ -115,128 +106,118 @@ export function BannerManager({ storeId }: BannerManagerProps) {
         }
     };
 
-    const handleSaveBanner = async () => {
+    const handleSaveLogo = async () => {
         if (!firestore || !imageFile) {
             toast({ variant: 'destructive', title: 'Error', description: 'No seleccionaste ninguna imagen.' });
             return;
         }
 
         setIsSaving(true);
-        toast({ title: 'Guardando banner...' });
+        toast({ title: 'Guardando logo...' });
         
         try {
-            if (!storeRef) throw new Error("Referencia a la tienda no disponible");
+            if (!storeRef) throw new Error('Referencia a la tienda no disponible');
 
-            toast({ title: 'Subiendo nueva imagen...' });
             const { secure_url, public_id } = await uploadImageToCloudinary(imageFile, storeId);
-            
-            // Ya no se elimina la imagen anterior de Cloudinary para evitar el uso del api_secret.
-            // La imagen antigua quedará huérfana en Cloudinary.
-            
-            await updateDoc(storeRef, { bannerUrl: secure_url, bannerPublicId: public_id });
-            
-            toast({ title: '¡Banner actualizado con éxito!' });
+            await updateDoc(storeRef, { logoUrl: secure_url, logoPublicId: public_id });
+
+            toast({ title: '¡Logo actualizado con éxito!' });
             setImageFile(null);
-            
         } catch (error: any) {
-            console.error('Error updating banner:', error);
-            toast({ variant: 'destructive', title: 'Error', description: error.message || 'No se pudo actualizar el banner.' });
+            console.error('Error updating logo:', error);
+            toast({ variant: 'destructive', title: 'Error', description: error.message || 'No se pudo actualizar el logo.' });
         } finally {
             setIsSaving(false);
         }
     };
 
-    const handleDeleteBanner = async () => {
-         if (!firestore || !store?.bannerPublicId) {
-            toast({ variant: 'destructive', title: 'Error', description: 'No hay banner para eliminar.' });
+    const handleDeleteLogo = async () => {
+        if (!firestore || !store?.logoPublicId) {
+            toast({ variant: 'destructive', title: 'Error', description: 'No hay logo para eliminar.' });
             return;
         }
         setIsDeleting(true);
-        toast({ title: 'Eliminando banner...' });
+        toast({ title: 'Eliminando logo...' });
 
         try {
-            if (!storeRef) throw new Error("Referencia a la tienda no disponible");
-            // Ya no se elimina la imagen de Cloudinary para evitar el uso del api_secret.
-            // La imagen antigua quedará huérfana en Cloudinary.
-            await updateDoc(storeRef, { bannerUrl: "", bannerPublicId: "" });
-            
-            toast({ title: 'Banner eliminado' });
+            if (!storeRef) throw new Error('Referencia a la tienda no disponible');
+            await updateDoc(storeRef, { logoUrl: '', logoPublicId: '' });
+
+            toast({ title: 'Logo eliminado' });
             setImageFile(null);
             setImagePreview(null);
         } catch (error: any) {
-            console.error('Error deleting banner:', error);
-            toast({ variant: 'destructive', title: 'Error', description: error.message || 'No se pudo eliminar el banner.' });
+            console.error('Error deleting logo:', error);
+            toast({ variant: 'destructive', title: 'Error', description: error.message || 'No se pudo eliminar el logo.' });
         } finally {
             setIsDeleting(false);
             setShowDeleteConfirm(false);
         }
     };
-    
+
     if (isLoadingStore) {
         return (
-             <Card>
+            <Card>
                 <CardHeader>
                     <Skeleton className="h-8 w-1/2" />
                     <Skeleton className="h-4 w-3/4" />
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <Skeleton className="h-10 w-full" />
-                    <Skeleton className="w-full aspect-[851/315]" />
+                    <Skeleton className="w-32 h-32 rounded-full" />
                     <Skeleton className="h-10 w-32" />
                 </CardContent>
             </Card>
-        )
+        );
     }
 
     return (
         <>
             <Card>
                 <CardHeader>
-                    <CardTitle>Banner de la Tienda</CardTitle>
-                    <CardDescription>Sube un banner para la cabecera de tu tienda. Tamaño recomendado: 851x315px.</CardDescription>
+                    <CardTitle>Logo de la Tienda</CardTitle>
+                    <CardDescription>Sube un logo cuadrado para tu tienda. Tamaño recomendado: 400x400px.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div>
-                        <Input id="banner-image-upload" type="file" accept="image/png, image/jpeg, image/webp" onChange={handleImageChange} disabled={isSaving}/>
+                        <Input id="logo-image-upload" type="file" accept="image/png, image/jpeg, image/webp" onChange={handleImageChange} disabled={isSaving} />
                     </div>
 
-                    <div className="relative mt-4 w-full aspect-[851/315] rounded-md border-2 border-dashed bg-muted flex items-center justify-center">
+                    <div className="relative aspect-square w-32">
                         {imagePreview ? (
-                             <Image src={imagePreview} alt="Vista previa del banner" fill className="rounded-md object-contain" />
+                            <Image src={imagePreview} alt="Logo" fill className="rounded-full object-cover" />
                         ) : (
-                            <div className="text-center text-muted-foreground">
-                                <ImageIcon className="mx-auto h-12 w-12" />
-                                <p>Vista previa del banner</p>
+                            <div className="flex h-full w-full items-center justify-center rounded-full border border-dashed text-muted-foreground">
+                                <ImageIcon className="h-6 w-6" />
                             </div>
                         )}
                     </div>
-                    
-                    <div className="flex gap-2">
-                        <Button onClick={handleSaveBanner} disabled={isSaving || !imageFile}>
-                            {isSaving ? 'Guardando...' : 'Guardar Banner'}
+
+                    <div className="flex items-center gap-2">
+                        <Button onClick={handleSaveLogo} disabled={!imageFile || isSaving}>
+                            {isSaving ? 'Guardando...' : 'Guardar logo'}
                         </Button>
-                        {store?.bannerUrl && (
-                             <Button variant="destructive" onClick={() => setShowDeleteConfirm(true)} disabled={isDeleting}>
+                        {imagePreview && (
+                            <Button variant="outline" onClick={() => setShowDeleteConfirm(true)} disabled={isDeleting}>
                                 <Trash2 className="mr-2 h-4 w-4" />
-                                {isDeleting ? 'Eliminando...' : 'Eliminar Banner Actual'}
+                                Eliminar
                             </Button>
                         )}
                     </div>
                 </CardContent>
             </Card>
+
             <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                        <AlertDialogTitle>¿Eliminar logo?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Esta acción no se puede deshacer. Se eliminará la referencia al banner de tu tienda, pero la imagen no se borrará de Cloudinary.
+                            Esta acción no se puede deshacer.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDeleteBanner} disabled={isDeleting}>
-                            {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
-                        </AlertDialogAction>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeleteLogo}>Eliminar</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

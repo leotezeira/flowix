@@ -23,19 +23,39 @@ type Store = {
 
 /**
  * Sube una imagen a Cloudinary usando un "upload preset" sin firma.
- * Esto es seguro para usar en el lado del cliente porque no expone ninguna clave secreta.
- * La configuración del preset (carpetas, transformaciones) se gestiona en el dashboard de Cloudinary.
- * @param file - El archivo de imagen a subir.
- * @param storeId - El ID de la tienda para organizar la subida en una carpeta específica.
- * @returns La URL segura y el ID público de la imagen subida.
+ * IMPORTANTE: Este código se ejecuta ÚNICAMENTE dentro de handlers de evento (onClick, onSubmit).
+ * No se ejecuta durante render, build ni en Server Components.
  */
 const uploadImageToCloudinary = async (file: File, storeId: string): Promise<{ secure_url: string; public_id: string }> => {
+    // Validar variables SOLO dentro del handler de evento
+    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
+    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET?.trim();
+
+    // Log de debug SOLO en handler
+    console.log('[Cloudinary Upload] cloud_name:', cloudName);
+    console.log('[Cloudinary Upload] upload_preset:', uploadPreset);
+
+    if (!cloudName || cloudName === '') {
+        throw new Error('❌ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME está vacío o undefined en runtime');
+    }
+
+    if (!uploadPreset || uploadPreset === '') {
+        throw new Error('❌ NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET está vacío o undefined en runtime');
+    }
+
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('upload_preset', process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || '');
+    formData.append('upload_preset', uploadPreset);
     formData.append('folder', `stores/${storeId}/banner`);
 
-    const response = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`, {
+    const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
+    console.log('[Cloudinary Upload] URL:', uploadUrl);
+    console.log('[Cloudinary Upload] FormData entries:');
+    for (const [key, value] of formData.entries()) {
+        console.log(`  ${key}:`, value instanceof File ? `File(${value.name})` : value);
+    }
+
+    const response = await fetch(uploadUrl, {
         method: 'POST',
         body: formData,
     });
