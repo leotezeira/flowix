@@ -307,7 +307,7 @@ export default function StorePage() {
                                                 <div
                                                     key={product.id}
                                                     onClick={() => handleSelectProduct(product)}
-                                                    className={`flex min-h-[96px] items-center gap-3 rounded-[10px] bg-white p-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${((product.stock ?? 0) <= 0) ? 'opacity-70' : ''}`}
+                                                    className={`flex min-h-[96px] items-center gap-3 rounded-[10px] bg-white p-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${!isBundle && ((product.stock ?? 0) <= 0) ? 'opacity-70' : ''}`}
                                                 >
                                                     <div className="flex h-24 w-[72px] flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
                                                         {product.imageUrl ? (

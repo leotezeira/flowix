@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { AlertTriangle } from 'lucide-react';
 import type { BundleSelection, CartItem, Product } from './StoreClient';
-import { SimpleVariantSelector } from '@/components/products/simplified-selector';
+import { HorizontalVariantSelector } from '@/components/products/horizontal-variant-selector';
 import type { VariantSelection } from '@/types/variants';
 
 interface BundleDetailDialogProps {
@@ -161,99 +162,98 @@ export function BundleDetailDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl flex flex-col max-h-[85vh]">
         <DialogHeader>
           <DialogTitle>{product.name}</DialogTitle>
           <DialogDescription>Configurá tu pack seleccionando productos y variantes para cada ítem</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Arma tu pack de {itemCount} ítems. Precio fijo: ${product.price.toFixed(2)}
-          </p>
-          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-            <span className="rounded-full bg-muted px-2 py-1">{allowRepeat ? 'Permite repetir' : 'Sin repetición'}</span>
-            <span className="rounded-full bg-muted px-2 py-1">Máx {maxPerProduct} por producto</span>
-          </div>
-
-          <div className="space-y-4">
-            {selections.map((selection, index) => {
-              const selectedProduct = getProductById(selection.productId);
-              const countForProduct = selection.productId ? selectionCounts[selection.productId] || 0 : 0;
-
-              return (
-                <Card key={index} className="p-4 border border-primary/20 bg-primary/5">
-                  <div className="space-y-3">
-                    <div className="text-sm font-semibold">Ítem {index + 1}</div>
-                    <Select
-                      value={selection.productId}
-                      onValueChange={(value) => handleProductChange(index, value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccioná un producto" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {eligibleProducts.map((option) => {
-                          const optionCount = selectionCounts[option.id] || 0;
-                          const disabledByRepeat =
-                            (!allowRepeat && optionCount > 0 && option.id !== selection.productId) ||
-                            (allowRepeat && optionCount >= maxPerProduct && option.id !== selection.productId);
-                          const disabledByStock = (option.stock ?? 0) <= 0;
-
-                          return (
-                            <SelectItem
-                              key={option.id}
-                              value={option.id}
-                              disabled={disabledByRepeat || disabledByStock}
-                            >
-                              {option.name} {(option.stock ?? 0) <= 0 ? '• Sin stock' : ''}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-
-                    {selectedProduct ? (
-                      <div className="space-y-3">
-                        {(selectedProduct.variants?.length ?? 0) > 0 ? (
-                          <div className="rounded-md bg-white p-3 border border-muted">
-                            <p className="text-sm font-medium text-muted-foreground mb-3">Variantes:</p>
-                            <SimpleVariantSelector
-                              product={{
-                                id: selectedProduct.id,
-                                name: selectedProduct.name,
-                                basePrice: selectedProduct.basePrice || selectedProduct.price,
-                                variants: selectedProduct.variants || [],
-                              }}
-                              open
-                              hideDialog
-                              onOpenChange={() => undefined}
-                              onConfirm={(variantSelections) => handleVariantsChange(index, variantSelections)}
-                            />
-                          </div>
-                        ) : (
-                          <p className="text-xs text-muted-foreground italic">Este producto no tiene variantes.</p>
-                        )}
-                        {allowRepeat && countForProduct >= maxPerProduct && (
-                          <p className="text-xs text-destructive">Se alcanzó el máximo por producto.</p>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">Seleccioná un producto para ver variantes.</p>
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-
-          {(errorMessage || validationError) && (
-            <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <span>{errorMessage || validationError}</span>
+        <ScrollArea className="flex-1 pr-4">
+          <div className="space-y-4 pb-4">
+            <p className="text-sm text-muted-foreground">
+              Arma tu pack de {itemCount} ítems. Precio fijo: ${product.price.toFixed(2)}
+            </p>
+            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <span className="rounded-full bg-muted px-2 py-1">{allowRepeat ? 'Permite repetir' : 'Sin repetición'}</span>
+              <span className="rounded-full bg-muted px-2 py-1">Máx {maxPerProduct} por producto</span>
             </div>
-          )}
-        </div>
+
+            <div className="space-y-3">
+              {selections.map((selection, index) => {
+                const selectedProduct = getProductById(selection.productId);
+                const countForProduct = selection.productId ? selectionCounts[selection.productId] || 0 : 0;
+
+                return (
+                  <Card key={index} className="p-3 border border-primary/20 bg-primary/5">
+                    <div className="space-y-2">
+                      <div className="text-sm font-semibold">Ítem {index + 1}</div>
+                      <Select
+                        value={selection.productId}
+                        onValueChange={(value) => handleProductChange(index, value)}
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue placeholder="Seleccioná un producto" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {eligibleProducts.map((option) => {
+                            const optionCount = selectionCounts[option.id] || 0;
+                            const disabledByRepeat =
+                              (!allowRepeat && optionCount > 0 && option.id !== selection.productId) ||
+                              (allowRepeat && optionCount >= maxPerProduct && option.id !== selection.productId);
+                            const disabledByStock = (option.stock ?? 0) <= 0;
+
+                            return (
+                              <SelectItem
+                                key={option.id}
+                                value={option.id}
+                                disabled={disabledByRepeat || disabledByStock}
+                              >
+                                {option.name} {(option.stock ?? 0) <= 0 ? '• Sin stock' : ''}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+
+                      {selectedProduct ? (
+                        <div className="space-y-2">
+                          {(selectedProduct.variants?.length ?? 0) > 0 ? (
+                            <div className="rounded-md bg-white p-2 border border-muted">
+                              <HorizontalVariantSelector
+                                product={{
+                                  id: selectedProduct.id,
+                                  name: selectedProduct.name,
+                                  basePrice: selectedProduct.basePrice || selectedProduct.price,
+                                  variants: selectedProduct.variants || [],
+                                }}
+                                selectedVariants={selection.variants}
+                                onVariantChange={(variants) => handleVariantsChange(index, variants)}
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground italic">Este producto no tiene variantes.</p>
+                          )}
+                          {allowRepeat && countForProduct >= maxPerProduct && (
+                            <p className="text-xs text-destructive">Se alcanzó el máximo por producto.</p>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">Seleccioná un producto para ver variantes.</p>
+                      )}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {(errorMessage || validationError) && (
+              <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <span>{errorMessage || validationError}</span>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
 
         <DialogFooter className="mt-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
