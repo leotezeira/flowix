@@ -24,7 +24,12 @@ export type Store = {
     giftCardActive?: boolean;
     subscription?: {
         status?: 'active' | 'past_due' | 'canceled' | 'trialing' | 'expired';
+        trialStartedAt?: any;
         trialEndsAt?: any;
+        lastPaymentDate?: any;
+        nextBillingDate?: any;
+        subscriptionEndDate?: any;
+        updatedAt?: any;
     };
 }
 
@@ -203,8 +208,7 @@ export default function StorePage() {
     const isSubscriptionActive =
         store.giftCardActive ||
         store.subscription?.status === 'active' ||
-        (store.subscription?.status === 'trialing' && trialEndsAt && Date.now() < trialEndsAt) ||
-        (!store.subscription && true);
+        (store.subscription?.status === 'trialing' && trialEndsAt && Date.now() < trialEndsAt);
 
     if (!isSubscriptionActive) {
         return (

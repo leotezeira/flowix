@@ -50,9 +50,14 @@ type Store = {
     businessHours?: BusinessHour[];
     subscription?: {
         status?: 'active' | 'past_due' | 'canceled' | 'trialing' | 'expired';
+        trialStartedAt?: any;
         trialEndsAt?: any;
+        lastPaymentDate?: any;
+        nextBillingDate?: any;
+        subscriptionEndDate?: any;
         updatedAt?: any;
     };
+    createdAt?: any;
 };
 
 type OrderItem = {
@@ -250,8 +255,7 @@ export default function AdminStorePage() {
     const isSubscriptionActive =
         store?.giftCardActive ||
         store?.subscription?.status === 'active' ||
-        (store?.subscription?.status === 'trialing' && trialEndsAt && Date.now() < trialEndsAt) ||
-        (!store?.subscription && true);
+        (store?.subscription?.status === 'trialing' && trialEndsAt && Date.now() < trialEndsAt);
 
     useEffect(() => {
         if (!isSubscriptionActive) {
@@ -381,13 +385,18 @@ export default function AdminStorePage() {
     const handleActivateSubscription = async () => {
         if (!firestore || !store?.id) return;
         try {
+            const subscriptionEndDate = new Date();
+            subscriptionEndDate.setDate(subscriptionEndDate.getDate() + 30); // 30 días
+
             await updateDoc(doc(firestore, 'stores', store.id), {
-                subscription: {
-                    status: 'active',
-                    updatedAt: serverTimestamp(),
-                },
+                'subscription.status': 'active',
+                'subscription.lastPaymentDate': serverTimestamp(),
+                'subscription.subscriptionEndDate': subscriptionEndDate,
+                'subscription.nextBillingDate': subscriptionEndDate,
+                'subscription.updatedAt': serverTimestamp(),
             });
-            toast({ title: 'Suscripción activada' });
+            toast({ title: 'Suscripción activada', description: 'Tu tienda está activa por 30 días.' });
+            window.location.reload();
         } catch (error) {
             console.error('Error updating subscription:', error);
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la suscripción.' });
@@ -497,7 +506,9 @@ export default function AdminStorePage() {
 
             {blockUI && (
                 <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-                    Tu suscripción venció. Solo podés acceder a la sección de Suscripción.
+                    {store?.subscription?.status === 'expired' 
+                        ? 'Tu período de prueba venció. Debes abonar para seguir utilizando el servicio.'
+                        : 'Tu suscripción venció. Solo podés acceder a la sección de Suscripción.'}
                 </div>
             )}
 
@@ -823,14 +834,48 @@ export default function AdminStorePage() {
                                             </Badge>
                                         </div>
                                     )}
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-medium">Prueba gratuita</span>
-                                        <span className="text-sm text-muted-foreground">
-                                            {trialEndsAt ? `${Math.max(0, Math.ceil((trialEndsAt - Date.now()) / (1000 * 60 * 60 * 24)))} días restantes` : 'Sin datos'}
-                                        </span>
-                                    </div>
+                                    {store?.subscription?.status === 'trialing' && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-medium">Período de prueba</span>
+                                            <span className="text-sm font-medium text-blue-600">
+                                                {trialEndsAt ? `${Math.max(0, Math.ceil((trialEndsAt - Date.now()) / (1000 * 60 * 60 * 24)))} días restantes` : 'Sin datos'}
+                                            </span>
+                                        </div>
+                                    )}
+                                    {store?.subscription?.status === 'active' && store?.subscription?.nextBillingDate && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-medium">Próximo pago</span>
+                                            <span className="text-sm text-muted-foreground">
+                                                {new Date(typeof store.subscription.nextBillingDate === 'number' 
+                                                    ? store.subscription.nextBillingDate 
+                                                    : store.subscription.nextBillingDate?.toDate?.() || 0).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
+
+                            {!isSubscriptionActive && !store.giftCardActive && (
+                                <Card className="border-yellow-500/50 bg-yellow-500/5">
+                                    <CardHeader>
+                                        <CardTitle className="text-yellow-700">Reactivar Tienda</CardTitle>
+                                        <CardDescription>
+                                            Tu tienda está desactivada. Haz clic para reactivarla después del pago.
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <Button 
+                                            onClick={handleActivateSubscription}
+                                            className="w-full"
+                                        >
+                                            Reactivar Tienda (30 días)
+                                        </Button>
+                                        <p className="text-xs text-muted-foreground mt-3">
+                                            Usa este botón después de realizar el pago para reactivar tu tienda.
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                            )}
 
                             {!store.giftCardActive && (
                                 <Card>

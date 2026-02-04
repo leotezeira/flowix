@@ -77,6 +77,8 @@ export default function AdminHubPage() {
 
     try {
       const storeSlug = slugify(values.storeName);
+      const now = new Date();
+      const trialEndsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 días
 
       const storeRef = await addDoc(collection(firestore, "stores"), {
         name: values.storeName,
@@ -84,6 +86,12 @@ export default function AdminHubPage() {
         slug: storeSlug,
         phone: values.whatsapp,
         createdAt: serverTimestamp(),
+        subscription: {
+          status: 'trialing',
+          trialStartedAt: serverTimestamp(),
+          trialEndsAt: serverTimestamp(new Date(trialEndsAt)),
+          updatedAt: serverTimestamp(),
+        },
       });
 
       // Actualizar el documento del usuario para registrar el inicio del período de prueba
@@ -95,7 +103,7 @@ export default function AdminHubPage() {
 
       toast({
         title: "¡Tienda creada!",
-        description: "Tu tienda ha sido creada con éxito. Iniciaste tu período de prueba gratuito.",
+        description: "Tu tienda ha sido creada con éxito. Iniciaste tu período de prueba gratuito de 7 días.",
       });
 
       router.push(`/admin/store/${storeSlug}`);
