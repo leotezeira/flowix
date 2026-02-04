@@ -22,7 +22,6 @@ import { CategoriesManager } from './categories-manager';
 import { ProductsManager } from './products-manager';
 import { BannerManager } from './banner-manager';
 import { LogoManager } from '@/app/admin/store/logo-manager';
-import { SubscriptionPaymentOptions } from '@/components/subscription/payment-options';
 
 type BusinessHour = {
     day: string;
@@ -697,18 +696,6 @@ export default function AdminClient() {
                                             {trialEndsAt ? `${Math.max(0, Math.ceil((trialEndsAt - Date.now()) / (1000 * 60 * 60 * 24)))} días restantes` : 'Sin datos'}
                                         </span>
                                     </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Opciones de Pago</CardTitle>
-                                    <CardDescription>
-                                        Renueva o activa tu suscripción con Mercado Pago
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <SubscriptionPaymentOptions />
                                 </CardContent>
                             </Card>
                         </div>

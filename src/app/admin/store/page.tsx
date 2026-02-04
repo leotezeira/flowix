@@ -22,7 +22,6 @@ import { CategoriesManager } from './categories-manager';
 import { ProductsManager } from './products-manager';
 import { BannerManager } from './banner-manager';
 import { LogoManager } from './logo-manager';
-import { SubscriptionPaymentOptions } from '@/components/subscription/payment-options';
 
 type BusinessHour = {
     day: string;
@@ -832,20 +831,6 @@ export default function AdminStorePage() {
                                     </div>
                                 </CardContent>
                             </Card>
-
-                            {!store.giftCardActive && (
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Opciones de Pago</CardTitle>
-                                        <CardDescription>
-                                            Renueva o activa tu suscripción con Mercado Pago
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <SubscriptionPaymentOptions />
-                                    </CardContent>
-                                </Card>
-                            )}
 
                             {!store.giftCardActive && (
                                 <Card>
