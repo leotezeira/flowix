@@ -19,6 +19,7 @@ export type Store = {
     bannerUrl?: string;
     deliveryEnabled?: boolean;
     deliveryFee?: number;
+    welcomeMessage?: string;
     subscription?: {
         status?: 'active' | 'past_due' | 'canceled' | 'trialing' | 'expired';
         trialEndsAt?: any;
@@ -201,7 +202,7 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
                     </div>
                 )}
                  <div className="mb-12 text-center">
-                    <p className="mt-4 text-xl text-muted-foreground">¡Bienvenido a nuestra tienda!</p>
+                    <p className="mt-4 text-xl text-muted-foreground">{store.welcomeMessage || '¡Bienvenido a nuestra tienda!'}</p>
                 </div>
 
                 {isLoadingMenu ? (

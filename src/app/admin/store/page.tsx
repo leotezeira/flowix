@@ -45,6 +45,7 @@ type Store = {
     deliveryEnabled?: boolean;
     deliveryFee?: number;
     manualClosed?: boolean;
+    welcomeMessage?: string;
     businessHours?: BusinessHour[];
     subscription?: {
         status?: 'active' | 'past_due' | 'canceled' | 'trialing' | 'expired';
@@ -119,6 +120,7 @@ export default function AdminStorePage() {
     const [deliveryEnabled, setDeliveryEnabled] = useState(false);
     const [deliveryFee, setDeliveryFee] = useState(0);
     const [manualClosed, setManualClosed] = useState(false);
+    const [welcomeMessage, setWelcomeMessage] = useState('');
     const [businessHours, setBusinessHours] = useState<BusinessHour[]>(DEFAULT_HOURS);
     const [savingSettings, setSavingSettings] = useState(false);
     const [savingHours, setSavingHours] = useState(false);
@@ -181,6 +183,7 @@ export default function AdminStorePage() {
                 setDeliveryEnabled(!!storeData.deliveryEnabled);
                 setDeliveryFee(storeData.deliveryFee || 0);
                 setManualClosed(!!storeData.manualClosed);
+                setWelcomeMessage(storeData.welcomeMessage || '');
                 setBusinessHours(storeData.businessHours || DEFAULT_HOURS);
             } catch (error) {
                 console.error('Error checking store ownership: ', error);
@@ -326,6 +329,7 @@ export default function AdminStorePage() {
                 deliveryEnabled,
                 deliveryFee: deliveryEnabled ? deliveryFee : 0,
                 manualClosed,
+                welcomeMessage,
             });
             toast({ title: 'Configuración guardada' });
         } catch (error) {
@@ -607,6 +611,16 @@ export default function AdminStorePage() {
                                         value={storeAddress}
                                         onChange={(e) => setStoreAddress(e.target.value)}
                                     />
+                                    <div>
+                                        <label className="text-sm font-medium mb-2 block">Mensaje de bienvenida</label>
+                                        <Textarea
+                                            placeholder="Ej: ¡Bienvenido a nuestra tienda! Hacemos envíos a todo el país."
+                                            value={welcomeMessage}
+                                            onChange={(e) => setWelcomeMessage(e.target.value)}
+                                            rows={3}
+                                        />
+                                        <p className="text-xs text-muted-foreground mt-1">Este mensaje se mostrará en la página principal de tu tienda.</p>
+                                    </div>
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <p className="font-medium">Envío a domicilio</p>

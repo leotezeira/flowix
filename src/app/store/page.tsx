@@ -20,6 +20,7 @@ export type Store = {
     bannerUrl?: string;
     deliveryEnabled?: boolean;
     deliveryFee?: number;
+    welcomeMessage?: string;
     subscription?: {
         status?: 'active' | 'past_due' | 'canceled' | 'trialing' | 'expired';
         trialEndsAt?: any;
@@ -242,9 +243,7 @@ export default function StorePage() {
                     </div>
                 )}
                  <div className="mb-12 text-center">
-                    <p className="mt-4 text-xl text-muted-foreground">¡Bienvenido a nuestra tienda!</p>
-                </div>
-
+                    <p className="mt-4 text-xl text-muted-foreground">{store.welcomeMessage || '¡Bienvenido a nuestra tienda!'}</p>
                 {isLoadingMenu ? (
                      <div className="text-center">Cargando menú...</div>
                 ) : sortedCategories && sortedCategories.length > 0 ? (
