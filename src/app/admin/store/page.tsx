@@ -22,6 +22,7 @@ import { CategoriesManager } from './categories-manager';
 import { ProductsManager } from './products-manager';
 import { BannerManager } from './banner-manager';
 import { LogoManager } from './logo-manager';
+import { SubscriptionPaymentOptions } from '@/components/subscription/payment-options';
 
 type BusinessHour = {
     day: string;
@@ -268,29 +269,37 @@ export default function AdminStorePage() {
         const status = searchParams?.get('status');
         const months = searchParams?.get('months');
         
-        if (status === 'success' && firestore && user) {
+        if (status === 'success' && firestore && store?.id) {
             const processPayment = async () => {
                 try {
-                    const userRef = doc(firestore, 'users', user.uid);
-                    const now = Date.now();
                     const monthsNum = months ? parseInt(months) : 1;
-                    const subscriptionEnd = now + monthsNum * 30 * 24 * 60 * 60 * 1000;
+                    const subscriptionEndDate = new Date();
+                    subscriptionEndDate.setDate(subscriptionEndDate.getDate() + monthsNum * 30);
 
-                    await updateDoc(userRef, {
-                        'subscription.subscriptionStatus': 'active',
-                        'subscription.lastPaymentDate': now,
-                        'subscription.subscriptionEnd': subscriptionEnd,
+                    // Actualizar la tienda con la suscripción activa
+                    await updateDoc(doc(firestore, 'stores', store.id), {
+                        'subscription.status': 'active',
+                        'subscription.lastPaymentDate': serverTimestamp(),
+                        'subscription.subscriptionEndDate': subscriptionEndDate,
+                        'subscription.nextBillingDate': subscriptionEndDate,
+                        'subscription.updatedAt': serverTimestamp(),
                     });
 
                     toast({
                         title: '¡Pago exitoso!',
-                        description: `Tu suscripción ha sido activada por ${monthsNum} ${monthsNum === 1 ? 'mes' : 'meses'}.`,
+                        description: `Tu tienda ha sido reactivada por ${monthsNum} ${monthsNum === 1 ? 'mes' : 'meses'}.`,
                     });
 
-                    // Limpiar params de la URL
-                    router.replace('/admin/store');
+                    // Limpiar params de la URL y recargar
+                    router.replace(pathname || '/admin/store');
+                    setTimeout(() => window.location.reload(), 1000);
                 } catch (error) {
                     console.error('Error procesando pago:', error);
+                    toast({
+                        title: 'Error',
+                        description: 'Hubo un error al activar tu suscripción. Contacta soporte.',
+                        variant: 'destructive',
+                    });
                 }
             };
 
@@ -301,15 +310,15 @@ export default function AdminStorePage() {
                 description: 'No se pudo completar el pago. Por favor, intenta nuevamente.',
                 variant: 'destructive',
             });
-            router.replace('/admin/store');
+            router.replace(pathname || '/admin/store');
         } else if (status === 'pending') {
             toast({
                 title: 'Pago pendiente',
                 description: 'Tu pago está pendiente de confirmación. Te notificaremos cuando se complete.',
             });
-            router.replace('/admin/store');
+            router.replace(pathname || '/admin/store');
         }
-    }, [searchParams, firestore, user, toast, router]);
+    }, [searchParams, firestore, store?.id, toast, router, pathname]);
 
     const periodNumber = Number(periodDays);
     const periodStart = Date.now() - periodNumber * 24 * 60 * 60 * 1000;
@@ -379,27 +388,6 @@ export default function AdminStorePage() {
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudieron guardar los datos del usuario.' });
         } finally {
             setSavingUser(false);
-        }
-    };
-
-    const handleActivateSubscription = async () => {
-        if (!firestore || !store?.id) return;
-        try {
-            const subscriptionEndDate = new Date();
-            subscriptionEndDate.setDate(subscriptionEndDate.getDate() + 30); // 30 días
-
-            await updateDoc(doc(firestore, 'stores', store.id), {
-                'subscription.status': 'active',
-                'subscription.lastPaymentDate': serverTimestamp(),
-                'subscription.subscriptionEndDate': subscriptionEndDate,
-                'subscription.nextBillingDate': subscriptionEndDate,
-                'subscription.updatedAt': serverTimestamp(),
-            });
-            toast({ title: 'Suscripción activada', description: 'Tu tienda está activa por 30 días.' });
-            window.location.reload();
-        } catch (error) {
-            console.error('Error updating subscription:', error);
-            toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la suscripción.' });
         }
     };
 
@@ -856,23 +844,15 @@ export default function AdminStorePage() {
                             </Card>
 
                             {!isSubscriptionActive && !store.giftCardActive && (
-                                <Card className="border-yellow-500/50 bg-yellow-500/5">
+                                <Card>
                                     <CardHeader>
-                                        <CardTitle className="text-yellow-700">Reactivar Tienda</CardTitle>
+                                        <CardTitle>Renovar Suscripción</CardTitle>
                                         <CardDescription>
-                                            Tu tienda está desactivada. Haz clic para reactivarla después del pago.
+                                            Seleccioná un plan para reactivar tu tienda
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent>
-                                        <Button 
-                                            onClick={handleActivateSubscription}
-                                            className="w-full"
-                                        >
-                                            Reactivar Tienda (30 días)
-                                        </Button>
-                                        <p className="text-xs text-muted-foreground mt-3">
-                                            Usa este botón después de realizar el pago para reactivar tu tienda.
-                                        </p>
+                                        <SubscriptionPaymentOptions />
                                     </CardContent>
                                 </Card>
                             )}
