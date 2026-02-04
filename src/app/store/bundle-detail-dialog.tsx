@@ -163,13 +163,13 @@ export function BundleDetailDialog({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl flex flex-col max-h-[85vh]">
-        <DialogHeader>
+        <DialogHeader className="px-6 pt-6 pb-0">
           <DialogTitle>{product.name}</DialogTitle>
           <DialogDescription>Configurá tu pack seleccionando productos y variantes para cada ítem</DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 pr-4">
-          <div className="space-y-4 pb-4">
+        <ScrollArea className="flex-1">
+          <div className="space-y-4 px-6 py-4 pb-6">
             <p className="text-sm text-muted-foreground">
               Arma tu pack de {itemCount} ítems. Precio fijo: ${product.price.toFixed(2)}
             </p>
@@ -233,9 +233,6 @@ export function BundleDetailDialog({
                           ) : (
                             <p className="text-xs text-muted-foreground italic">Este producto no tiene variantes.</p>
                           )}
-                          {allowRepeat && countForProduct >= maxPerProduct && (
-                            <p className="text-xs text-destructive">Se alcanzó el máximo por producto.</p>
-                          )}
                         </div>
                       ) : (
                         <p className="text-xs text-muted-foreground">Seleccioná un producto para ver variantes.</p>
@@ -255,7 +252,7 @@ export function BundleDetailDialog({
           </div>
         </ScrollArea>
 
-        <DialogFooter className="mt-2">
+        <DialogFooter className="px-6 py-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>

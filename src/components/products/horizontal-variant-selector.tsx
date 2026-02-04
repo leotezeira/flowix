@@ -72,9 +72,6 @@ export function HorizontalVariantSelector({
                     onClick={() => handleToggleOption(group.id, option.id, isRequired)}
                   >
                     {option.label}
-                    {option.priceModifier && option.priceModifier !== 0 && (
-                      <span className="ml-1 text-[10px]">+${option.priceModifier.toFixed(2)}</span>
-                    )}
                   </Button>
                 );
               })}
