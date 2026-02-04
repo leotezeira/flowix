@@ -62,6 +62,14 @@ service cloud.firestore {
         allow create: if true;
         allow read, update, delete: if isOwner(get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId);
       }
+
+      // /stores/{storeId}/customers/{customerId}
+      // Anyone can create/update customer info when placing orders.
+      // Only the store owner can read or delete customers.
+      match /customers/{customerId} {
+        allow create, update: if true;
+        allow read, delete: if isOwner(get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId);
+      }
     }
   }
 }

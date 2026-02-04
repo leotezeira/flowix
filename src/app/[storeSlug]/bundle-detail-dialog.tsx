@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
@@ -164,6 +164,7 @@ export function BundleDetailDialog({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{product.name}</DialogTitle>
+          <DialogDescription>Configurá tu pack seleccionando productos y variantes para cada ítem</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

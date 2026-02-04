@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Trash2, Pencil } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import type { Category } from './categories-manager';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { uploadImage } from '@/lib/cloudinary-upload';
 import { VariantManager } from '@/components/products/variant-manager';
@@ -732,6 +732,7 @@ function ProductEditDialog({ product, storeId, categories, products, onOpenChang
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Producto</DialogTitle>
+          <DialogDescription>Modificá la información del producto y sus variantes</DialogDescription>
         </DialogHeader>
         <Form {...editForm}>
           <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
