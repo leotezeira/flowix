@@ -84,7 +84,7 @@ export function SimpleVariantSelector({
   // Si hideDialog es true, solo renderizar los controles sin el Dialog
   if (hideDialog) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         {product.variants.map((group) =>
           group.type === 'required' ? (
             <RequiredVariantGroup
@@ -96,23 +96,6 @@ export function SimpleVariantSelector({
                   ...selectedVariants,
                   [group.id]: [optionId],
                 });
-                // Auto confirmar al cambiar
-                setTimeout(() => {
-                  const newSelections = { ...selectedVariants, [group.id]: [optionId] };
-                  let total = 0;
-                  for (const [gId, optIds] of Object.entries(newSelections)) {
-                    const g = product.variants.find((v) => v.id === gId);
-                    if (g) {
-                      for (const optId of optIds) {
-                        const opt = g.options.find((o) => o.id === optId);
-                        if (opt?.priceModifier) {
-                          total += opt.priceModifier;
-                        }
-                      }
-                    }
-                  }
-                  onConfirm(newSelections, total);
-                }, 0);
               }}
             />
           ) : (
@@ -125,27 +108,26 @@ export function SimpleVariantSelector({
                   ...selectedVariants,
                   [group.id]: optionIds,
                 });
-                // Auto confirmar al cambiar
-                setTimeout(() => {
-                  const newSelections = { ...selectedVariants, [group.id]: optionIds };
-                  let total = 0;
-                  for (const [gId, optIds] of Object.entries(newSelections)) {
-                    const g = product.variants.find((v) => v.id === gId);
-                    if (g) {
-                      for (const optId of optIds) {
-                        const opt = g.options.find((o) => o.id === optId);
-                        if (opt?.priceModifier) {
-                          total += opt.priceModifier;
-                        }
-                      }
-                    }
-                  }
-                  onConfirm(newSelections, total);
-                }, 0);
               }}
             />
           )
         )}
+        <div className="pt-2 text-sm">
+          <button
+            type="button"
+            onClick={() => {
+              if (!isValid()) {
+                alert('Completa todas las variantes obligatorias');
+                return;
+              }
+              const totalPrice = calculatePrice() - (product.basePrice || 0);
+              onConfirm(selectedVariants, totalPrice);
+            }}
+            className="w-full px-3 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm"
+          >
+            Confirmar variantes
+          </button>
+        </div>
       </div>
     );
   }

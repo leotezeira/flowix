@@ -305,7 +305,7 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
                                                                             {tag}
                                                                         </span>
                                                                     ))}
-                                                                    {(product.stock ?? 0) <= 0 && (
+                                                                    {(product.stock ?? 0) <= 0 && !isBundle && (
                                                                         <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                                                                             Sin stock
                                                                         </span>

@@ -182,7 +182,7 @@ export function BundleDetailDialog({
               const countForProduct = selection.productId ? selectionCounts[selection.productId] || 0 : 0;
 
               return (
-                <Card key={index} className="p-4">
+                <Card key={index} className="p-4 border border-primary/20 bg-primary/5">
                   <div className="space-y-3">
                     <div className="text-sm font-semibold">Ítem {index + 1}</div>
                     <Select
@@ -216,20 +216,23 @@ export function BundleDetailDialog({
                     {selectedProduct ? (
                       <div className="space-y-3">
                         {(selectedProduct.variants?.length ?? 0) > 0 ? (
-                          <SimpleVariantSelector
-                            product={{
-                              id: selectedProduct.id,
-                              name: selectedProduct.name,
-                              basePrice: selectedProduct.basePrice || selectedProduct.price,
-                              variants: selectedProduct.variants || [],
-                            }}
-                            open
-                            hideDialog
-                            onOpenChange={() => undefined}
-                            onConfirm={(variantSelections) => handleVariantsChange(index, variantSelections)}
-                          />
+                          <div className="rounded-md bg-white p-3 border border-muted">
+                            <p className="text-sm font-medium text-muted-foreground mb-3">Variantes:</p>
+                            <SimpleVariantSelector
+                              product={{
+                                id: selectedProduct.id,
+                                name: selectedProduct.name,
+                                basePrice: selectedProduct.basePrice || selectedProduct.price,
+                                variants: selectedProduct.variants || [],
+                              }}
+                              open
+                              hideDialog
+                              onOpenChange={() => undefined}
+                              onConfirm={(variantSelections) => handleVariantsChange(index, variantSelections)}
+                            />
+                          </div>
                         ) : (
-                          <p className="text-xs text-muted-foreground">Este producto no tiene variantes.</p>
+                          <p className="text-xs text-muted-foreground italic">Este producto no tiene variantes.</p>
                         )}
                         {allowRepeat && countForProduct >= maxPerProduct && (
                           <p className="text-xs text-destructive">Se alcanzó el máximo por producto.</p>
