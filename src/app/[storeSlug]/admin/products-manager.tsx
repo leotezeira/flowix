@@ -26,6 +26,7 @@ import type { VariantGroup } from '@/types/variants';
 type Product = {
   id: string;
   name: string;
+  type?: 'simple' | 'bundle';
   price: number;
   categoryId: string;
   description?: string;
@@ -33,10 +34,17 @@ type Product = {
   stock?: number;
   order?: number;
   variants?: VariantGroup[];
+  bundleConfig?: {
+    itemCount: number;
+    allowRepeat: boolean;
+    maxPerProduct: number;
+    productIds: string[];
+  };
 };
 
 const productFormSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
+  type: z.enum(['simple', 'bundle']).default('simple'),
   description: z.string().optional(),
   price: z.coerce.number().min(0, 'El precio no puede ser negativo'),
   stock: z.coerce.number().min(0, 'El stock no puede ser negativo').optional(),
@@ -59,6 +67,9 @@ export function ProductsManager({ storeId }: { storeId:string }) {
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const [variants, setVariants] = useState<VariantGroup[]>([]);
     const [resizeImage, setResizeImage] = useState(true);
+    const [bundleProductIds, setBundleProductIds] = useState<string[]>([]);
+    const [bundleAllowRepeat, setBundleAllowRepeat] = useState(true);
+    const [bundleMaxPerProduct, setBundleMaxPerProduct] = useState(3);
     
     const categoriesQuery = useMemo(() => {
         if (!firestore) return null;
@@ -74,8 +85,9 @@ export function ProductsManager({ storeId }: { storeId:string }) {
 
     const createForm = useForm<ProductFormValues>({
         resolver: zodResolver(productFormSchema),
-      defaultValues: { name: '', description: '', price: 0, stock: 0, order: 0, categoryId: '', variants: [] },
+      defaultValues: { name: '', type: 'simple', description: '', price: 0, stock: 0, order: 0, categoryId: '', variants: [] },
     });
+    const createType = createForm.watch('type');
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -138,15 +150,62 @@ export function ProductsManager({ storeId }: { storeId:string }) {
         toast({ title: 'Guardando producto...' });
 
         try {
+            const productType = values.type ?? 'simple';
+            const bundleItemCount = 3;
+            let bundleConfig: Product['bundleConfig'] | undefined;
+            let variantsToSave = variants;
+            let stockToSave = values.stock || 0;
+
+            if (productType === 'bundle') {
+                if (bundleProductIds.length === 0) {
+                    toast({ variant: 'destructive', title: 'Bundle inválido', description: 'Seleccioná al menos un producto base para el pack.' });
+                    return;
+                }
+
+                if (bundleProductIds.length > 3) {
+                    toast({ variant: 'destructive', title: 'Bundle inválido', description: 'No podés seleccionar más de 3 productos base.' });
+                    return;
+                }
+
+                if (!bundleAllowRepeat && bundleProductIds.length < bundleItemCount) {
+                    toast({ variant: 'destructive', title: 'Bundle inválido', description: 'Para un pack de 3 ítems sin repetición necesitás 3 productos distintos.' });
+                    return;
+                }
+
+                const selectedProducts = (products || []).filter((prod) => bundleProductIds.includes(prod.id));
+                const invalidProduct = selectedProducts.find((prod) => (prod.variants?.length ?? 0) > 3);
+                if (invalidProduct) {
+                    toast({
+                        variant: 'destructive',
+                        title: 'Bundle inválido',
+                        description: `El producto ${invalidProduct.name} tiene más de 3 variantes.`
+                    });
+                    return;
+                }
+
+                const maxPerProduct = Math.min(Math.max(1, bundleMaxPerProduct), bundleItemCount);
+                bundleConfig = {
+                    itemCount: bundleItemCount,
+                    allowRepeat: bundleAllowRepeat,
+                    maxPerProduct: bundleAllowRepeat ? maxPerProduct : 1,
+                    productIds: bundleProductIds,
+                };
+                variantsToSave = [];
+                stockToSave = 0;
+            }
+
             const productData = {
                 storeId,
                 name: values.name,
+                name_lower: values.name.toLowerCase(),
+                type: productType,
                 description: values.description,
                 price: values.price,
-              stock: values.stock || 0,
+              stock: stockToSave,
               order: values.order || 0,
                 categoryId: values.categoryId,
-                variants: variants,
+                variants: variantsToSave,
+                bundleConfig: bundleConfig || null,
             };
             
             const newDocRef = await addDoc(productsQuery, productData);
@@ -176,6 +235,9 @@ export function ProductsManager({ storeId }: { storeId:string }) {
             createForm.reset();
             clearImage();
             setVariants([]);
+            setBundleProductIds([]);
+            setBundleAllowRepeat(true);
+            setBundleMaxPerProduct(3);
 
         } catch (error) {
             console.error('Error creating product:', error);
@@ -250,11 +312,32 @@ export function ProductsManager({ storeId }: { storeId:string }) {
                                     </FormItem>
                                   )}
                                 />
+                                <FormField
+                                  control={createForm.control}
+                                  name="type"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Tipo de producto</FormLabel>
+                                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Selecciona un tipo" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          <SelectItem value="simple">Producto simple</SelectItem>
+                                          <SelectItem value="bundle">Bundle / Pack</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
                                 <FormField control={createForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Nombre del producto</FormLabel> <FormControl><Input placeholder="Ej: Hamburguesa Clásica" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                                 <FormField control={createForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Descripción (opcional)</FormLabel> <FormControl><Textarea placeholder="Ej: Medallón de 180g, queso cheddar, panceta, etc." {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                                 <FormField control={createForm.control} name="price" render={({ field }) => ( <FormItem> <FormLabel>Precio base</FormLabel> <FormControl><Input type="number" step="0.01" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                                 <div className="grid gap-4 md:grid-cols-2">
-                                  <FormField control={createForm.control} name="stock" render={({ field }) => ( <FormItem> <FormLabel>Stock</FormLabel> <FormControl><Input type="number" min={0} step="1" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                                  <FormField control={createForm.control} name="stock" render={({ field }) => ( <FormItem> <FormLabel>Stock</FormLabel> <FormControl><Input type="number" min={0} step="1" {...field} disabled={createType === 'bundle'} /></FormControl> <FormMessage /> </FormItem> )}/>
                                   <FormField control={createForm.control} name="order" render={({ field }) => ( <FormItem> <FormLabel>Orden</FormLabel> <FormControl><Input type="number" min={0} step="1" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
                                 </div>
                                 <FormItem>
@@ -276,10 +359,74 @@ export function ProductsManager({ storeId }: { storeId:string }) {
                                     )}
                                 </FormItem>
                                 <Separator />
-                                <VariantManager 
-                                  variants={variants}
-                                  onChange={setVariants}
-                                />
+                                {createType === 'bundle' ? (
+                                  <div className="space-y-4">
+                                    <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+                                      Este bundle siempre tendrá 3 ítems. Configurá los productos base y las reglas.
+                                    </div>
+                                    <div className="flex items-center gap-3 text-sm">
+                                      <Checkbox checked={bundleAllowRepeat} onCheckedChange={(checked) => {
+                                        const allowRepeat = Boolean(checked);
+                                        setBundleAllowRepeat(allowRepeat);
+                                        if (!allowRepeat) {
+                                          setBundleMaxPerProduct(1);
+                                        }
+                                      }} />
+                                      <span>Permitir repetir el mismo producto</span>
+                                    </div>
+                                    <FormItem>
+                                      <FormLabel>Máximo por producto</FormLabel>
+                                      <FormControl>
+                                        <Input
+                                          type="number"
+                                          min={1}
+                                          max={3}
+                                          step="1"
+                                          value={bundleMaxPerProduct}
+                                          disabled={!bundleAllowRepeat}
+                                          onChange={(e) => setBundleMaxPerProduct(Number(e.target.value) || 1)}
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                    <div className="space-y-2">
+                                      <FormLabel>Productos base (máximo 3)</FormLabel>
+                                      <div className="grid gap-2">
+                                        {(products || [])
+                                          .filter((prod) => (prod.type ?? 'simple') === 'simple')
+                                          .map((prod) => {
+                                            const tooManyVariants = (prod.variants?.length ?? 0) > 3;
+                                            const checked = bundleProductIds.includes(prod.id);
+                                            return (
+                                              <label key={prod.id} className="flex items-center gap-2 text-sm">
+                                                <Checkbox
+                                                  checked={checked}
+                                                  disabled={tooManyVariants || (!checked && bundleProductIds.length >= 3)}
+                                                  onCheckedChange={(value) => {
+                                                    const isChecked = Boolean(value);
+                                                    setBundleProductIds((prev) => {
+                                                      if (isChecked) {
+                                                        return prev.includes(prod.id) ? prev : [...prev, prod.id];
+                                                      }
+                                                      return prev.filter((id) => id !== prod.id);
+                                                    });
+                                                  }}
+                                                />
+                                                <span>
+                                                  {prod.name}
+                                                  {tooManyVariants ? ' (más de 3 variantes)' : ''}
+                                                </span>
+                                              </label>
+                                            );
+                                          })}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <VariantManager 
+                                    variants={variants}
+                                    onChange={setVariants}
+                                  />
+                                )}
                                 <Separator />
                                 <Button type="submit" disabled={isSaving} className="mt-4"> {isSaving ? 'Guardando...' : 'Guardar Producto'} </Button>
                             </form>
@@ -349,6 +496,7 @@ export function ProductsManager({ storeId }: { storeId:string }) {
                 product={editingProduct}
                 storeId={storeId}
                 categories={categories || []}
+                products={products || []}
                 onOpenChange={() => setEditingProduct(null)}
                 onProductUpdated={() => setEditingProduct(null)}
             />
@@ -380,11 +528,12 @@ interface ProductEditDialogProps {
   product: Product;
   storeId: string;
   categories: Category[];
+  products: Product[];
   onOpenChange: (open: boolean) => void;
   onProductUpdated: () => void;
 }
 
-function ProductEditDialog({ product, storeId, categories, onOpenChange, onProductUpdated }: ProductEditDialogProps) {
+function ProductEditDialog({ product, storeId, categories, products, onOpenChange, onProductUpdated }: ProductEditDialogProps) {
   const firestore = useFirestore();
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
@@ -392,10 +541,14 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [editVariants, setEditVariants] = useState<VariantGroup[]>(product.variants || []);
   const [resizeImage, setResizeImage] = useState(true);
+  const [editBundleProductIds, setEditBundleProductIds] = useState<string[]>(product.bundleConfig?.productIds || []);
+  const [editBundleAllowRepeat, setEditBundleAllowRepeat] = useState(product.bundleConfig?.allowRepeat ?? true);
+  const [editBundleMaxPerProduct, setEditBundleMaxPerProduct] = useState(product.bundleConfig?.maxPerProduct ?? 3);
 
 
   const defaultValues = useMemo(() => ({
     name: product.name || '',
+    type: product.type || 'simple',
     description: product.description || '',
     price: product.price || 0,
     stock: product.stock || 0,
@@ -408,11 +561,15 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
     resolver: zodResolver(productFormSchema),
     defaultValues,
   });
+  const editType = editForm.watch('type');
   
   useEffect(() => {
     editForm.reset(defaultValues);
     setImagePreview(product.imageUrl || null);
     setEditVariants(product.variants || []);
+    setEditBundleProductIds(product.bundleConfig?.productIds || []);
+    setEditBundleAllowRepeat(product.bundleConfig?.allowRepeat ?? true);
+    setEditBundleMaxPerProduct(product.bundleConfig?.maxPerProduct ?? 3);
   }, [product, defaultValues, editForm]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -478,15 +635,61 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
 
     try {
       const productRef = doc(firestore, 'stores', storeId, 'products', product.id);
+      const productType = values.type ?? 'simple';
+      const bundleItemCount = 3;
+      let bundleConfig: Product['bundleConfig'] | undefined;
+      let variantsToSave = editVariants;
+      let stockToSave = values.stock || 0;
+
+      if (productType === 'bundle') {
+        if (editBundleProductIds.length === 0) {
+          toast({ variant: 'destructive', title: 'Bundle inválido', description: 'Seleccioná al menos un producto base para el pack.' });
+          return;
+        }
+
+        if (editBundleProductIds.length > 3) {
+          toast({ variant: 'destructive', title: 'Bundle inválido', description: 'No podés seleccionar más de 3 productos base.' });
+          return;
+        }
+
+        if (!editBundleAllowRepeat && editBundleProductIds.length < bundleItemCount) {
+          toast({ variant: 'destructive', title: 'Bundle inválido', description: 'Para un pack de 3 ítems sin repetición necesitás 3 productos distintos.' });
+          return;
+        }
+
+        const selectedProducts = (products || []).filter((prod) => editBundleProductIds.includes(prod.id));
+        const invalidProduct = selectedProducts.find((prod) => (prod.variants?.length ?? 0) > 3);
+        if (invalidProduct) {
+          toast({
+            variant: 'destructive',
+            title: 'Bundle inválido',
+            description: `El producto ${invalidProduct.name} tiene más de 3 variantes.`
+          });
+          return;
+        }
+
+        const maxPerProduct = Math.min(Math.max(1, editBundleMaxPerProduct), bundleItemCount);
+        bundleConfig = {
+          itemCount: bundleItemCount,
+          allowRepeat: editBundleAllowRepeat,
+          maxPerProduct: editBundleAllowRepeat ? maxPerProduct : 1,
+          productIds: editBundleProductIds,
+        };
+        variantsToSave = [];
+        stockToSave = 0;
+      }
       
       await updateDoc(productRef, {
         name: values.name,
+        name_lower: values.name.toLowerCase(),
+        type: productType,
         description: values.description,
         price: values.price,
-        stock: values.stock || 0,
+        stock: stockToSave,
         order: values.order || 0,
         categoryId: values.categoryId,
-        variants: editVariants,
+        variants: variantsToSave,
+        bundleConfig: bundleConfig || null,
       });
       toast({ title: 'Producto actualizado'});
 
@@ -557,11 +760,32 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
                 </FormItem>
               )}
             />
+            <FormField
+              control={editForm.control}
+              name="type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo de producto</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un tipo" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="simple">Producto simple</SelectItem>
+                      <SelectItem value="bundle">Bundle / Pack</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField control={editForm.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Nombre del producto</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
             <FormField control={editForm.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Descripción (opcional)</FormLabel> <FormControl><Textarea {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
             <FormField control={editForm.control} name="price" render={({ field }) => ( <FormItem> <FormLabel>Precio base</FormLabel> <FormControl><Input type="number" step="0.01" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
             <div className="grid gap-4 md:grid-cols-2">
-              <FormField control={editForm.control} name="stock" render={({ field }) => ( <FormItem> <FormLabel>Stock</FormLabel> <FormControl><Input type="number" min={0} step="1" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={editForm.control} name="stock" render={({ field }) => ( <FormItem> <FormLabel>Stock</FormLabel> <FormControl><Input type="number" min={0} step="1" {...field} disabled={editType === 'bundle'} /></FormControl> <FormMessage /> </FormItem> )}/>
               <FormField control={editForm.control} name="order" render={({ field }) => ( <FormItem> <FormLabel>Orden</FormLabel> <FormControl><Input type="number" min={0} step="1" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
             </div>
              <FormItem>
@@ -583,8 +807,72 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
                 )}
             </FormItem>
             <Separator />
-            <VariantManager variants={editVariants} onChange={setEditVariants} />
-            
+            {editType === 'bundle' ? (
+              <div className="space-y-4">
+                <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+                  Este bundle siempre tendrá 3 ítems. Configurá los productos base y las reglas.
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                  <Checkbox checked={editBundleAllowRepeat} onCheckedChange={(checked) => {
+                    const allowRepeat = Boolean(checked);
+                    setEditBundleAllowRepeat(allowRepeat);
+                    if (!allowRepeat) {
+                      setEditBundleMaxPerProduct(1);
+                    }
+                  }} />
+                  <span>Permitir repetir el mismo producto</span>
+                </div>
+                <FormItem>
+                  <FormLabel>Máximo por producto</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={3}
+                      step="1"
+                      value={editBundleMaxPerProduct}
+                      disabled={!editBundleAllowRepeat}
+                      onChange={(e) => setEditBundleMaxPerProduct(Number(e.target.value) || 1)}
+                    />
+                  </FormControl>
+                </FormItem>
+                <div className="space-y-2">
+                  <FormLabel>Productos base (máximo 3)</FormLabel>
+                  <div className="grid gap-2">
+                    {(products || [])
+                      .filter((prod) => (prod.type ?? 'simple') === 'simple' && prod.id !== product.id)
+                      .map((prod) => {
+                        const tooManyVariants = (prod.variants?.length ?? 0) > 3;
+                        const checked = editBundleProductIds.includes(prod.id);
+                        return (
+                          <label key={prod.id} className="flex items-center gap-2 text-sm">
+                            <Checkbox
+                              checked={checked}
+                              disabled={tooManyVariants || (!checked && editBundleProductIds.length >= 3)}
+                              onCheckedChange={(value) => {
+                                const isChecked = Boolean(value);
+                                setEditBundleProductIds((prev) => {
+                                  if (isChecked) {
+                                    return prev.includes(prod.id) ? prev : [...prev, prod.id];
+                                  }
+                                  return prev.filter((id) => id !== prod.id);
+                                });
+                              }}
+                            />
+                            <span>
+                              {prod.name}
+                              {tooManyVariants ? ' (más de 3 variantes)' : ''}
+                            </span>
+                          </label>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <VariantManager variants={editVariants} onChange={setEditVariants} />
+            )}
+
             <DialogFooter className="pt-4">
                <DialogClose asChild><Button type="button" variant="secondary" disabled={isSaving}>Cancelar</Button></DialogClose>
               <Button type="submit" disabled={isSaving}>

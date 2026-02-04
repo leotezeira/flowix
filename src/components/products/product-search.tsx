@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -114,12 +113,10 @@ export function ProductSearch<T extends { id: string; name: string; price?: numb
                                     {/* Imagen del producto */}
                                     <div className="relative w-full aspect-square bg-muted rounded-t-lg overflow-hidden">
                                         {product.imageUrl ? (
-                                            <Image
+                                            <img
                                                 src={product.imageUrl}
                                                 alt={product.name}
-                                                fill
-                                                sizes="50vw"
-                                                className="object-cover"
+                                                className="w-full h-full object-cover"
                                             />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center">

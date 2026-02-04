@@ -1,18 +1,17 @@
 'use client';
 import { useState, useMemo } from 'react';
-import dynamic from 'next/dynamic';
-import Image from 'next/image';
 import { collection } from "firebase/firestore";
-import { useFirestore, useCollectionOnce } from '@/firebase';
+import { useFirestore, useCollection } from '@/firebase';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { CartSheet } from './cart-sheet';
 import type { VariantGroup, VariantSelection } from '@/types/variants';
+import { SimpleVariantSelector } from '@/components/products/simplified-selector';
+import { ProductDetailDialog } from './product-detail-dialog';
 import { ProductSearch } from '@/components/products/product-search';
-
-const CartSheet = dynamic(() => import('./cart-sheet').then(mod => mod.CartSheet));
-const SimpleVariantSelector = dynamic(() => import('@/components/products/simplified-selector').then(mod => mod.SimpleVariantSelector));
-const ProductDetailDialog = dynamic(() => import('./product-detail-dialog').then(mod => mod.ProductDetailDialog));
+import { BundleDetailDialog } from './bundle-detail-dialog';
 
 export type Store = {
     id: string;
@@ -42,6 +41,20 @@ export type Category = {
     order?: number;
 }
 
+export type BundleConfig = {
+    itemCount: number;
+    allowRepeat: boolean;
+    maxPerProduct: number;
+    productIds: string[];
+};
+
+export type BundleSelection = {
+    slot: number;
+    productId: string;
+    productName: string;
+    variants: VariantSelection;
+};
+
 export type Product = {
     id: string;
     name: string;
@@ -54,6 +67,8 @@ export type Product = {
     stock?: number;
     order?: number;
         variants?: VariantGroup[];
+    type?: 'simple' | 'bundle';
+    bundleConfig?: BundleConfig;
 }
 
 export type CartItem = {
@@ -61,6 +76,8 @@ export type CartItem = {
   quantity: number;
     selectedVariants?: VariantSelection;
   totalPrice: number;
+    isBundle?: boolean;
+    bundleSelections?: BundleSelection[];
 }
 
 export default function StoreClient({ initialStore }: { initialStore?: Store }) {
@@ -74,6 +91,8 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
     const [variantSelectorPending, setVariantSelectorPending] = useState<{ product: Product; quantity: number } | null>(null);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [showProductDetail, setShowProductDetail] = useState(false);
+    const [selectedBundle, setSelectedBundle] = useState<Product | null>(null);
+    const [showBundleDetail, setShowBundleDetail] = useState(false);
 
     // `initialStore` is provided by the server page; client fetch is not needed here.
     
@@ -81,13 +100,13 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
         if (!firestore || !store?.id) return null;
         return collection(firestore, 'stores', store.id, 'categories');
     }, [firestore, store?.id]);
-    const { data: categories, isLoading: loadingCategories } = useCollectionOnce<Category>(categoriesQuery);
+    const { data: categories, isLoading: loadingCategories } = useCollection<Category>(categoriesQuery);
     
     const productsQuery = useMemo(() => {
         if (!firestore || !store?.id) return null;
         return collection(firestore, 'stores', store.id, 'products');
     }, [firestore, store?.id]);
-    const { data: products, isLoading: loadingProducts } = useCollectionOnce<Product>(productsQuery);
+    const { data: products, isLoading: loadingProducts } = useCollection<Product>(productsQuery);
 
     const sortedCategories = useMemo(() => {
         if (!categories) return [];
@@ -127,6 +146,12 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
     };
 
     const handleSelectProduct = (product: Product) => {
+        if ((product.type ?? 'simple') === 'bundle') {
+            setSelectedBundle(product);
+            setShowBundleDetail(true);
+            return;
+        }
+
         setSelectedProduct(product);
         setShowProductDetail(true);
     };
@@ -204,13 +229,10 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
             <main className="mx-auto w-full max-w-[100vw] flex-1 overflow-y-auto px-4 py-6">
                  {store.bannerUrl && (
                     <div className="relative mb-12 w-full overflow-hidden rounded-lg shadow-lg" style={{ aspectRatio: '851 / 315' }}>
-                        <Image
+                        <img
                             src={store.bannerUrl}
                             alt={`Banner de ${store.name}`}
-                            fill
-                            priority
-                            sizes="100vw"
-                            className="object-cover"
+                            className="w-full h-full object-cover"
                         />
                     </div>
                 )}
@@ -238,6 +260,7 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
                                     <div className="flex flex-col gap-3">
                                         {productsByCategory[category.id].map(product => {
                                             const variantTags = (product.variants ?? []).map(variant => variant.name);
+                                            const isBundle = (product.type ?? 'simple') === 'bundle';
 
                                             return (
                                                 <div
@@ -247,15 +270,11 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
                                                 >
                                                     <div className="flex h-24 w-[72px] flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
                                                         {product.imageUrl ? (
-                                                            <div className="relative h-full w-full">
-                                                                <Image
-                                                                    src={product.imageUrl}
-                                                                    alt={product.name}
-                                                                    fill
-                                                                    sizes="72px"
-                                                                    className="object-contain"
-                                                                />
-                                                            </div>
+                                                            <img
+                                                                src={product.imageUrl}
+                                                                alt={product.name}
+                                                                className="h-full w-full object-contain"
+                                                            />
                                                         ) : (
                                                             <div className="h-full w-full" />
                                                         )}
@@ -271,8 +290,13 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
                                                                 </span>
                                                                 <span className="text-xs font-normal text-muted-foreground">ARS</span>
                                                             </div>
-                                                            {(variantTags.length > 0 || (product.stock ?? 0) <= 0) && (
+                                                            {((variantTags.length > 0 || isBundle) || (product.stock ?? 0) <= 0) && (
                                                                 <div className="mt-2 flex flex-wrap gap-1.5">
+                                                                    {isBundle && (
+                                                                        <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary">
+                                                                            Pack
+                                                                        </span>
+                                                                    )}
                                                                     {variantTags.map(tag => (
                                                                         <span
                                                                             key={tag}
@@ -332,6 +356,16 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
                     onOpenChange={setShowProductDetail}
                     onAddToCart={handleAddToCart}
                     storePhone={store?.phone}
+                />
+            )}
+
+            {selectedBundle && (
+                <BundleDetailDialog
+                    product={selectedBundle}
+                    availableProducts={products || []}
+                    isOpen={showBundleDetail}
+                    onOpenChange={setShowBundleDetail}
+                    onAddToCart={handleAddToCart}
                 />
             )}
         </div>

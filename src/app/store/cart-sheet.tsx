@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { ShoppingCart, Trash2 } from 'lucide-react';
 import type { CartItem, Store } from './page';
 import { useFirestore } from '@/firebase';
-import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, increment, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 
 interface CartSheetProps {
     cart: CartItem[];
@@ -65,13 +65,32 @@ export function CartSheet({ cart, store, isOpen, onOpenChange, onCartChange }: C
     async function persistOrder(values: z.infer<typeof checkoutFormSchema>) {
         if (!firestore || !store?.id) return;
 
-        const orderItems = cart.map((item) => ({
-            productId: item.product.id,
-            name: item.product.name,
-            quantity: item.quantity,
-            totalPrice: item.totalPrice,
-            variants: item.selectedVariants || {},
-        }));
+        const orderItems = cart.map((item) => {
+            if (item.isBundle && item.bundleSelections) {
+                return {
+                    productId: item.product.id,
+                    name: item.product.name,
+                    quantity: item.quantity,
+                    totalPrice: item.totalPrice,
+                    type: 'bundle',
+                    bundle: item.bundleSelections.map((selection) => ({
+                        slot: selection.slot + 1,
+                        productId: selection.productId,
+                        productName: selection.productName,
+                        variants: selection.variants,
+                    })),
+                };
+            }
+
+            return {
+                productId: item.product.id,
+                name: item.product.name,
+                quantity: item.quantity,
+                totalPrice: item.totalPrice,
+                type: 'simple',
+                variants: item.selectedVariants || {},
+            };
+        });
 
         await addDoc(collection(firestore, 'stores', store.id, 'orders'), {
             createdAt: serverTimestamp(),
@@ -95,6 +114,25 @@ export function CartSheet({ cart, store, isOpen, onOpenChange, onCartChange }: C
             },
             { merge: true }
         );
+
+        const bundleSelections = cart.flatMap((item) =>
+            item.isBundle && item.bundleSelections
+                ? item.bundleSelections.map((selection) => ({
+                      productId: selection.productId,
+                      quantity: item.quantity || 1,
+                  }))
+                : []
+        );
+
+        if (bundleSelections.length > 0) {
+            await Promise.allSettled(
+                bundleSelections.map((selection) =>
+                    updateDoc(doc(firestore, 'stores', store.id, 'products', selection.productId), {
+                        stock: increment(-1 * selection.quantity),
+                    })
+                )
+            );
+        }
     }
 
     async function onSubmit(values: z.infer<typeof checkoutFormSchema>) {
@@ -109,12 +147,25 @@ export function CartSheet({ cart, store, isOpen, onOpenChange, onCartChange }: C
         let orderSummary = "¡Hola! Quisiera hacer el siguiente pedido:\n\n";
         cart.forEach(item => {
             orderSummary += `*${item.quantity}x ${item.product.name}* - $${item.totalPrice.toFixed(2)}\n`;
-            Object.entries(item.selectedVariants || {}).forEach(([variant, options]) => {
-                const optionList = Array.isArray(options) ? options : [options];
-                optionList.forEach((option) => {
-                    orderSummary += `  - ${variant}: ${option}\n`;
+
+            if (item.isBundle && item.bundleSelections) {
+                item.bundleSelections.forEach((selection) => {
+                    orderSummary += `  - Ítem ${selection.slot + 1}: ${selection.productName}\n`;
+                    Object.entries(selection.variants || {}).forEach(([variant, options]) => {
+                        const optionList = Array.isArray(options) ? options : [options];
+                        optionList.forEach((option) => {
+                            orderSummary += `     • ${variant}: ${option}\n`;
+                        });
+                    });
                 });
-            });
+            } else {
+                Object.entries(item.selectedVariants || {}).forEach(([variant, options]) => {
+                    const optionList = Array.isArray(options) ? options : [options];
+                    optionList.forEach((option) => {
+                        orderSummary += `  - ${variant}: ${option}\n`;
+                    });
+                });
+            }
             orderSummary += '\n';
         });
         if (deliveryFee > 0) {
@@ -154,12 +205,30 @@ export function CartSheet({ cart, store, isOpen, onOpenChange, onCartChange }: C
                                     <div className="flex-grow">
                                         <p className="font-semibold">{item.quantity}x {item.product.name}</p>
                                         <div className="text-sm text-muted-foreground">
-                                            {Object.entries(item.selectedVariants || {}).map(([variant, options]) => {
-                                                const optionList = Array.isArray(options) ? options : [options];
-                                                return optionList.map((option) => (
-                                                    <p key={`${variant}-${option}`}>{variant}: {option}</p>
-                                                ));
-                                            })}
+                                            {item.isBundle && item.bundleSelections ? (
+                                                <div className="space-y-2">
+                                                    {item.bundleSelections.map((selection) => (
+                                                        <div key={`${selection.slot}-${selection.productId}`}>
+                                                            <p className="font-medium">Ítem {selection.slot + 1}: {selection.productName}</p>
+                                                            {Object.entries(selection.variants || {}).map(([variant, options]) => {
+                                                                const optionList = Array.isArray(options) ? options : [options];
+                                                                return optionList.map((option) => (
+                                                                    <p key={`${selection.slot}-${variant}-${option}`}>
+                                                                        {variant}: {option}
+                                                                    </p>
+                                                                ));
+                                                            })}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                Object.entries(item.selectedVariants || {}).map(([variant, options]) => {
+                                                    const optionList = Array.isArray(options) ? options : [options];
+                                                    return optionList.map((option) => (
+                                                        <p key={`${variant}-${option}`}>{variant}: {option}</p>
+                                                    ));
+                                                })
+                                            )}
                                         </div>
                                     </div>
                                     <div className="flex flex-col items-end justify-between">
