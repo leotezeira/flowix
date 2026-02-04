@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
         if (normalizedCode === normalizedGiftCode) {
             return NextResponse.json({
                 valid: true,
-                message: 'Código válido. Suscripción gratuita activada.'
+                message: 'Código válido.'
             });
         }
 

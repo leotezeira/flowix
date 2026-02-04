@@ -417,8 +417,8 @@ export default function AdminStorePage() {
                 });
                 
                 toast({ 
-                    title: '¡Gift Card activada!', 
-                    description: 'Tu tienda ahora tiene acceso gratuito permanente.' 
+                    title: 'Gift Card activada', 
+                    description: 'El código se aplicó correctamente.' 
                 });
                 
                 setGiftCode('');
@@ -820,7 +820,7 @@ export default function AdminStorePage() {
                                         <div className="flex items-center justify-between">
                                             <span className="font-medium">Gift Card</span>
                                             <Badge variant="default" className="bg-gradient-to-r from-purple-500 to-pink-500">
-                                                🎁 Activa - Acceso Gratuito Permanente
+                                                🎁 Activa
                                             </Badge>
                                         </div>
                                     )}
@@ -834,19 +834,31 @@ export default function AdminStorePage() {
                             </Card>
 
                             {!store.giftCardActive && (
-                                <Card className="border-primary/50 bg-gradient-to-br from-primary/5 to-primary/10">
+                                <Card>
                                     <CardHeader>
-                                        <CardTitle className="flex items-center gap-2">
-                                            🎁 Gift Cards
-                                        </CardTitle>
+                                        <CardTitle>Opciones de Pago</CardTitle>
                                         <CardDescription>
-                                            ¿Tenés un código de Gift Card? Activalo aquí para obtener acceso gratuito permanente.
+                                            Renueva o activa tu suscripción con Mercado Pago
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <SubscriptionPaymentOptions />
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {!store.giftCardActive && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Gift Card</CardTitle>
+                                        <CardDescription>
+                                            Ingresá tu código de Gift Card
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent className="space-y-4">
                                         <div className="flex gap-2">
                                             <Input
-                                                placeholder="Ingresá tu código de Gift Card"
+                                                placeholder="Código de Gift Card"
                                                 value={giftCode}
                                                 onChange={(e) => setGiftCode(e.target.value.trim())}
                                                 disabled={validatingGiftCode}
@@ -859,23 +871,6 @@ export default function AdminStorePage() {
                                                 {validatingGiftCode ? 'Validando...' : 'Activar'}
                                             </Button>
                                         </div>
-                                        <p className="text-xs text-muted-foreground">
-                                            Al activar un código válido, tu tienda tendrá acceso completo de forma gratuita sin límites de tiempo.
-                                        </p>
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            {!store.giftCardActive && (
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Opciones de Pago</CardTitle>
-                                        <CardDescription>
-                                            Renueva o activa tu suscripción con Mercado Pago
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <SubscriptionPaymentOptions />
                                     </CardContent>
                                 </Card>
                             )}
