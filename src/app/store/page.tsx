@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { CartSheet } from './cart-sheet';
 import type { VariantGroup, VariantSelection } from '@/types/variants';
 import { SimpleVariantSelector } from '@/components/products/simplified-selector';
+import { ProductDetailDialog } from './product-detail-dialog';
 
 export type Store = {
     id: string;
@@ -64,6 +65,8 @@ export default function StorePage() {
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [showVariantSelector, setShowVariantSelector] = useState(false);
     const [variantSelectorPending, setVariantSelectorPending] = useState<{ product: Product; quantity: number } | null>(null);
+    const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [showProductDetail, setShowProductDetail] = useState(false);
 
     useEffect(() => {
         if (pathname) {
@@ -144,37 +147,14 @@ export default function StorePage() {
     };
 
     const handleSelectProduct = (product: Product) => {
-        // Si el producto tiene variantes, mostrar el selector
-        if (product.variants && product.variants.length > 0) {
-            setVariantSelectorPending({ product, quantity: 1 });
-            setShowVariantSelector(true);
-        } else {
-            // Si no tiene variantes, agregar directamente al carrito
-            handleAddToCart({
-                product,
-                quantity: 1,
-                selectedVariants: {},
-                totalPrice: product.price || product.basePrice || 0,
-            });
-        }
+        setSelectedProduct(product);
+        setShowProductDetail(true);
     };
 
-    const handleVariantSelection = (selections: VariantSelection) => {
+    const handleVariantSelection = (selections: VariantSelection, priceModifier: number) => {
         if (!variantSelectorPending) return;
         
-        // Calcular el precio con los modificadores
-        let totalPrice = variantSelectorPending.product.price || variantSelectorPending.product.basePrice || 0;
-        
-        for (const [groupId, optionIds] of Object.entries(selections)) {
-            const group = variantSelectorPending.product.variants?.find(g => g.id === groupId);
-            if (group) {
-                for (const optionId of (Array.isArray(optionIds) ? optionIds : [optionIds])) {
-                    const option = group.options.find(o => o.id === optionId);
-                    if (option?.priceModifier) {
-                        totalPrice += option.priceModifier;
-                    }
-                }
-            }
+        const totalPrice = (variantSelectorPending.product.basePrice || variantSelectorPending.product.price) + priceModifier;
         }
 
         handleAddToCart({
@@ -281,7 +261,8 @@ export default function StorePage() {
                                             return (
                                                 <div
                                                     key={product.id}
-                                                    className={`flex min-h-[96px] items-center gap-3 rounded-[10px] bg-white p-3 shadow-sm ${((product.stock ?? 0) <= 0) ? 'opacity-70' : ''}`}
+                                                    onClick={() => handleSelectProduct(product)}
+                                                    className={`flex min-h-[96px] items-center gap-3 rounded-[10px] bg-white p-3 shadow-sm cursor-pointer hover:shadow-md transition-shadow ${((product.stock ?? 0) <= 0) ? 'opacity-70' : ''}`}
                                                 >
                                                     <div className="flex h-24 w-[72px] flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
                                                         {product.imageUrl ? (
@@ -323,17 +304,6 @@ export default function StorePage() {
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        <Button
-                                                            className="shrink-0"
-                                                            disabled={(product.stock ?? 0) <= 0}
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleSelectProduct(product);
-                                                            }}
-                                                        >
-                                                            <ShoppingCart className="mr-2 h-4 w-4" />
-                                                            {(product.stock ?? 0) <= 0 ? 'Sin stock' : 'Agregar'}
-                                                        </Button>
                                                     </div>
                                                 </div>
                                             );
@@ -367,6 +337,16 @@ export default function StorePage() {
                     open={showVariantSelector}
                     onOpenChange={setShowVariantSelector}
                     onConfirm={handleVariantSelection}
+                />
+            )}
+
+            {selectedProduct && (
+                <ProductDetailDialog
+                    product={selectedProduct}
+                    isOpen={showProductDetail}
+                    onOpenChange={setShowProductDetail}
+                    onAddToCart={handleAddToCart}
+                    storePhone={store?.phone}
                 />
             )}
         </div>

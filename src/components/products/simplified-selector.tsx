@@ -12,7 +12,8 @@ interface SimpleVariantSelectorProps {
   product: ProductWithVariants;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (selections: VariantSelection) => void;
+  onConfirm: (selections: VariantSelection, totalPrice: number) => void;
+  hideDialog?: boolean;
 }
 
 /**
@@ -25,6 +26,7 @@ export function SimpleVariantSelector({
   open,
   onOpenChange,
   onConfirm,
+  hideDialog = false,
 }: SimpleVariantSelectorProps) {
   const [selectedVariants, setSelectedVariants] = useState<VariantSelection>({});
 
@@ -65,14 +67,87 @@ export function SimpleVariantSelector({
       return;
     }
 
-    onConfirm(selectedVariants);
-    onOpenChange(false);
-    setSelectedVariants({});
+    const totalPrice = calculatePrice() - (product.basePrice || 0);
+    onConfirm(selectedVariants, totalPrice);
+    
+    if (!hideDialog) {
+      onOpenChange(false);
+      setSelectedVariants({});
+    }
   };
 
   // Si no hay variantes, confirmar directamente
   if (!product.variants || product.variants.length === 0) {
     return null;
+  }
+
+  // Si hideDialog es true, solo renderizar los controles sin el Dialog
+  if (hideDialog) {
+    return (
+      <div className="space-y-6">
+        {product.variants.map((group) =>
+          group.type === 'required' ? (
+            <RequiredVariantGroup
+              key={group.id}
+              group={group}
+              selectedOptionId={selectedVariants[group.id]?.[0]}
+              onSelect={(optionId) => {
+                setSelectedVariants({
+                  ...selectedVariants,
+                  [group.id]: [optionId],
+                });
+                // Auto confirmar al cambiar
+                setTimeout(() => {
+                  const newSelections = { ...selectedVariants, [group.id]: [optionId] };
+                  let total = 0;
+                  for (const [gId, optIds] of Object.entries(newSelections)) {
+                    const g = product.variants.find((v) => v.id === gId);
+                    if (g) {
+                      for (const optId of optIds) {
+                        const opt = g.options.find((o) => o.id === optId);
+                        if (opt?.priceModifier) {
+                          total += opt.priceModifier;
+                        }
+                      }
+                    }
+                  }
+                  onConfirm(newSelections, total);
+                }, 0);
+              }}
+            />
+          ) : (
+            <OptionalVariantGroup
+              key={group.id}
+              group={group}
+              selectedOptionIds={selectedVariants[group.id] || []}
+              onToggle={(optionIds) => {
+                setSelectedVariants({
+                  ...selectedVariants,
+                  [group.id]: optionIds,
+                });
+                // Auto confirmar al cambiar
+                setTimeout(() => {
+                  const newSelections = { ...selectedVariants, [group.id]: optionIds };
+                  let total = 0;
+                  for (const [gId, optIds] of Object.entries(newSelections)) {
+                    const g = product.variants.find((v) => v.id === gId);
+                    if (g) {
+                      for (const optId of optIds) {
+                        const opt = g.options.find((o) => o.id === optId);
+                        if (opt?.priceModifier) {
+                          total += opt.priceModifier;
+                        }
+                      }
+                    }
+                  }
+                  onConfirm(newSelections, total);
+                }, 0);
+              }}
+            />
+          )
+        )}
+      </div>
+    );
   }
 
   return (
