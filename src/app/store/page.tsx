@@ -244,6 +244,8 @@ export default function StorePage() {
                 )}
                  <div className="mb-12 text-center">
                     <p className="mt-4 text-xl text-muted-foreground">{store.welcomeMessage || '¡Bienvenido a nuestra tienda!'}</p>
+                </div>
+
                 {isLoadingMenu ? (
                      <div className="text-center">Cargando menú...</div>
                 ) : sortedCategories && sortedCategories.length > 0 ? (
