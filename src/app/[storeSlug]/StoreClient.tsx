@@ -10,6 +10,7 @@ import { CartSheet } from './cart-sheet';
 import type { VariantGroup, VariantSelection } from '@/types/variants';
 import { SimpleVariantSelector } from '@/components/products/simplified-selector';
 import { ProductDetailDialog } from './product-detail-dialog';
+import { ProductSearch } from '@/components/products/product-search';
 
 export type Store = {
     id: string;
@@ -42,6 +43,7 @@ export type Category = {
 export type Product = {
     id: string;
     name: string;
+    name_lower?: string;
     description?: string;
     price: number;
     categoryId: string;
@@ -210,6 +212,15 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
                  <div className="mb-12 text-center">
                     <p className="mt-4 text-xl text-muted-foreground">{store.welcomeMessage || '¡Bienvenido a nuestra tienda!'}</p>
                 </div>
+
+                {store.id && (
+                    <div className="mb-8">
+                        <ProductSearch 
+                            storeId={store.id}
+                            onProductSelect={handleSelectProduct}
+                        />
+                    </div>
+                )}
 
                 {isLoadingMenu ? (
                      <div className="text-center">Cargando menú...</div>

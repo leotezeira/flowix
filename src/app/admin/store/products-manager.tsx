@@ -141,6 +141,7 @@ export function ProductsManager({ storeId }: { storeId:string }) {
             const productData = {
                 storeId,
                 name: values.name,
+                name_lower: values.name.toLowerCase(),
                 description: values.description,
                 price: values.price,
               stock: values.stock || 0,
@@ -480,6 +481,7 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
       
       await updateDoc(productRef, {
         name: values.name,
+        name_lower: values.name.toLowerCase(),
         description: values.description,
         price: values.price,
         stock: values.stock || 0,
