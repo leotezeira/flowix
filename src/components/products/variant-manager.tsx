@@ -113,7 +113,7 @@ export function VariantManager({ variants, onChange }: VariantManagerProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Label className="text-lg font-semibold">Variantes del producto</Label>
-        <Button onClick={handleNewGroup} variant="outline" size="sm">
+        <Button type="button" onClick={handleNewGroup} variant="outline" size="sm">
           <Plus className="mr-2 h-4 w-4" />
           Agregar grupo
         </Button>
@@ -161,6 +161,7 @@ export function VariantManager({ variants, onChange }: VariantManagerProps) {
                 </div>
                 <div className="flex gap-2 ml-4">
                   <Button
+                    type="button"
                     onClick={() => handleEditGroup(group)}
                     variant="ghost"
                     size="sm"
@@ -168,6 +169,7 @@ export function VariantManager({ variants, onChange }: VariantManagerProps) {
                     <Edit2 className="h-4 w-4" />
                   </Button>
                   <Button
+                    type="button"
                     onClick={() => handleDeleteGroup(group.id)}
                     variant="ghost"
                     size="sm"
@@ -252,6 +254,7 @@ export function VariantManager({ variants, onChange }: VariantManagerProps) {
                       />
                     </div>
                     <Button
+                      type="button"
                       onClick={() => handleDeleteOption(index)}
                       variant="ghost"
                       size="sm"
@@ -263,6 +266,7 @@ export function VariantManager({ variants, onChange }: VariantManagerProps) {
                 ))}
               </div>
               <Button
+                type="button"
                 onClick={handleAddOption}
                 variant="outline"
                 size="sm"
@@ -275,10 +279,10 @@ export function VariantManager({ variants, onChange }: VariantManagerProps) {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDialog(false)}>
+            <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveGroup}>
+            <Button type="button" onClick={handleSaveGroup}>
               {editingGroupId ? 'Actualizar' : 'Crear'} grupo
             </Button>
           </DialogFooter>
