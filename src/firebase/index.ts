@@ -3,5 +3,6 @@ export * from './client-provider';
 
 // Export the specific data hooks
 export * from './firestore/use-collection';
+export * from './firestore/use-collection-once';
 export * from './firestore/use-doc';
 export * from './auth/use-user';

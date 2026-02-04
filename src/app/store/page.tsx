@@ -1,17 +1,19 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
+import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import { collection, getDocs, query, where, limit } from "firebase/firestore";
-import { useFirestore, useCollection } from '@/firebase';
+import { useFirestore, useCollectionOnce } from '@/firebase';
 import { usePathname } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { CartSheet } from './cart-sheet';
 import type { VariantGroup, VariantSelection } from '@/types/variants';
-import { SimpleVariantSelector } from '@/components/products/simplified-selector';
-import { ProductDetailDialog } from './product-detail-dialog';
 import { ProductSearch } from '@/components/products/product-search';
+
+const CartSheet = dynamic(() => import('./cart-sheet').then(mod => mod.CartSheet));
+const SimpleVariantSelector = dynamic(() => import('@/components/products/simplified-selector').then(mod => mod.SimpleVariantSelector));
+const ProductDetailDialog = dynamic(() => import('./product-detail-dialog').then(mod => mod.ProductDetailDialog));
 
 export type Store = {
     id: string;
@@ -110,13 +112,13 @@ export default function StorePage() {
         if (!firestore || !store?.id) return null;
         return collection(firestore, 'stores', store.id, 'categories');
     }, [firestore, store?.id]);
-    const { data: categories, isLoading: loadingCategories } = useCollection<Category>(categoriesQuery);
+    const { data: categories, isLoading: loadingCategories } = useCollectionOnce<Category>(categoriesQuery);
     
     const productsQuery = useMemo(() => {
         if (!firestore || !store?.id) return null;
         return collection(firestore, 'stores', store.id, 'products');
     }, [firestore, store?.id]);
-    const { data: products, isLoading: loadingProducts } = useCollection<Product>(productsQuery);
+    const { data: products, isLoading: loadingProducts } = useCollectionOnce<Product>(productsQuery);
 
     const sortedCategories = useMemo(() => {
         if (!categories) return [];
@@ -243,10 +245,13 @@ export default function StorePage() {
             <main className="mx-auto w-full max-w-[100vw] flex-1 overflow-y-auto px-4 py-6">
                  {store.bannerUrl && (
                     <div className="relative mb-12 w-full overflow-hidden rounded-lg shadow-lg" style={{ aspectRatio: '851 / 315' }}>
-                        <img
+                        <Image
                             src={store.bannerUrl}
                             alt={`Banner de ${store.name}`}
-                            className="w-full h-full object-cover"
+                            fill
+                            priority
+                            sizes="100vw"
+                            className="object-cover"
                         />
                     </div>
                 )}
@@ -283,11 +288,15 @@ export default function StorePage() {
                                                 >
                                                     <div className="flex h-24 w-[72px] flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
                                                         {product.imageUrl ? (
-                                                            <img
-                                                                src={product.imageUrl}
-                                                                alt={product.name}
-                                                                className="h-full w-full object-contain"
-                                                            />
+                                                            <div className="relative h-full w-full">
+                                                                <Image
+                                                                    src={product.imageUrl}
+                                                                    alt={product.name}
+                                                                    fill
+                                                                    sizes="72px"
+                                                                    className="object-contain"
+                                                                />
+                                                            </div>
                                                         ) : (
                                                             <div className="h-full w-full" />
                                                         )}
