@@ -31,7 +31,7 @@ export function Pricing() {
             </CardHeader>
             <CardContent className="flex flex-col items-center">
               <div className="mb-6">
-                <span className="text-5xl font-bold">$4.000</span>
+                <span className="text-5xl font-bold">$5.000</span>
                 <span className="text-lg text-muted-foreground"> ARS/mes</span>
               </div>
               <ul className="w-full space-y-3 text-left">

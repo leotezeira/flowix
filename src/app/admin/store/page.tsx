@@ -1,7 +1,7 @@
 'use client';
 
 import { useUser, useFirestore, useCollection, useDoc } from '@/firebase';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { collection, doc, getDocs, limit, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +22,7 @@ import { CategoriesManager } from './categories-manager';
 import { ProductsManager } from './products-manager';
 import { BannerManager } from './banner-manager';
 import { LogoManager } from './logo-manager';
+import { SubscriptionPaymentOptions } from '@/components/subscription/payment-options';
 
 type BusinessHour = {
     day: string;
@@ -100,6 +101,7 @@ export default function AdminStorePage() {
     const firestore = useFirestore();
     const router = useRouter();
     const pathname = usePathname();
+    const searchParams = useSearchParams();
     const { toast } = useToast();
 
     const [storeSlug, setStoreSlug] = useState('');
@@ -249,6 +251,54 @@ export default function AdminStorePage() {
             setActiveSection('suscripcion');
         }
     }, [isSubscriptionActive]);
+
+    // Manejar retorno de Mercado Pago
+    useEffect(() => {
+        const status = searchParams?.get('status');
+        const months = searchParams?.get('months');
+        
+        if (status === 'success' && firestore && user) {
+            const processPayment = async () => {
+                try {
+                    const userRef = doc(firestore, 'users', user.uid);
+                    const now = Date.now();
+                    const monthsNum = months ? parseInt(months) : 1;
+                    const subscriptionEnd = now + monthsNum * 30 * 24 * 60 * 60 * 1000;
+
+                    await updateDoc(userRef, {
+                        'subscription.subscriptionStatus': 'active',
+                        'subscription.lastPaymentDate': now,
+                        'subscription.subscriptionEnd': subscriptionEnd,
+                    });
+
+                    toast({
+                        title: '¡Pago exitoso!',
+                        description: `Tu suscripción ha sido activada por ${monthsNum} ${monthsNum === 1 ? 'mes' : 'meses'}.`,
+                    });
+
+                    // Limpiar params de la URL
+                    router.replace('/admin/store');
+                } catch (error) {
+                    console.error('Error procesando pago:', error);
+                }
+            };
+
+            processPayment();
+        } else if (status === 'failure') {
+            toast({
+                title: 'Pago fallido',
+                description: 'No se pudo completar el pago. Por favor, intenta nuevamente.',
+                variant: 'destructive',
+            });
+            router.replace('/admin/store');
+        } else if (status === 'pending') {
+            toast({
+                title: 'Pago pendiente',
+                description: 'Tu pago está pendiente de confirmación. Te notificaremos cuando se complete.',
+            });
+            router.replace('/admin/store');
+        }
+    }, [searchParams, firestore, user, toast, router]);
 
     const periodNumber = Number(periodDays);
     const periodStart = Date.now() - periodNumber * 24 * 60 * 60 * 1000;
@@ -685,27 +735,40 @@ export default function AdminStorePage() {
                     )}
 
                     {activeSection === 'suscripcion' && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Suscripción</CardTitle>
-                                <CardDescription>Gestiona tu plan y pagos</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <span className="font-medium">Estado</span>
-                                    <Badge variant={isSubscriptionActive ? 'default' : 'destructive'}>
-                                        {isSubscriptionActive ? 'Activa' : 'Vencida'}
-                                    </Badge>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="font-medium">Prueba gratuita</span>
-                                    <span className="text-sm text-muted-foreground">
-                                        {trialEndsAt ? `${Math.max(0, Math.ceil((trialEndsAt - Date.now()) / (1000 * 60 * 60 * 24)))} días restantes` : 'Sin datos'}
-                                    </span>
-                                </div>
-                                <Button onClick={handleActivateSubscription}>Pagar mensual</Button>
-                            </CardContent>
-                        </Card>
+                        <div className="space-y-6">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Estado de la Suscripción</CardTitle>
+                                    <CardDescription>Información actual de tu plan</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-medium">Estado</span>
+                                        <Badge variant={isSubscriptionActive ? 'default' : 'destructive'}>
+                                            {isSubscriptionActive ? 'Activa' : 'Vencida'}
+                                        </Badge>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-medium">Prueba gratuita</span>
+                                        <span className="text-sm text-muted-foreground">
+                                            {trialEndsAt ? `${Math.max(0, Math.ceil((trialEndsAt - Date.now()) / (1000 * 60 * 60 * 24)))} días restantes` : 'Sin datos'}
+                                        </span>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Opciones de Pago</CardTitle>
+                                    <CardDescription>
+                                        Renueva o activa tu suscripción con Mercado Pago
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <SubscriptionPaymentOptions />
+                                </CardContent>
+                            </Card>
+                        </div>
                     )}
                 </main>
             </div>

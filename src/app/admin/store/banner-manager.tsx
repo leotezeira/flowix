@@ -6,10 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import Image from 'next/image';
 import { Trash2, Image as ImageIcon } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { uploadImage } from '@/lib/cloudinary-upload';
 
 interface BannerManagerProps {
     storeId: string;
@@ -18,62 +18,7 @@ interface BannerManagerProps {
 type Store = {
     id: string;
     bannerUrl?: string;
-    bannerPublicId?: string;
 }
-
-/**
- * Sube una imagen a Cloudinary usando un "upload preset" sin firma.
- * IMPORTANTE: Este código se ejecuta ÚNICAMENTE dentro de handlers de evento (onClick, onSubmit).
- * No se ejecuta durante render, build ni en Server Components.
- */
-const uploadImageToCloudinary = async (file: File, storeId: string): Promise<{ secure_url: string; public_id: string }> => {
-    // Validar variables SOLO dentro del handler de evento
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
-    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET?.trim();
-
-    // Log de debug SOLO en handler
-    console.log('[Cloudinary Upload] cloud_name:', cloudName);
-    console.log('[Cloudinary Upload] upload_preset:', uploadPreset);
-
-    if (!cloudName || cloudName === '') {
-        throw new Error('❌ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME está vacío o undefined en runtime');
-    }
-
-    if (!uploadPreset || uploadPreset === '') {
-        throw new Error('❌ NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET está vacío o undefined en runtime');
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', uploadPreset);
-    formData.append('folder', `stores/${storeId}/banner`);
-
-    const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
-    console.log('[Cloudinary Upload] URL:', uploadUrl);
-    console.log('[Cloudinary Upload] FormData entries:');
-    for (const [key, value] of formData.entries()) {
-        console.log(`  ${key}:`, value instanceof File ? `File(${value.name})` : value);
-    }
-
-    const response = await fetch(uploadUrl, {
-        method: 'POST',
-        body: formData,
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-        console.error('Error de Cloudinary:', data);
-        const errorMessage = data?.error?.message || 'Ocurrió un error desconocido al subir la imagen.';
-        if (errorMessage.includes('Invalid upload preset')) {
-            throw new Error('Error de Cloudinary: El "upload preset" es inválido. Asegúrate de que está bien configurado como "unsigned" en tu cuenta de Cloudinary.');
-        }
-        throw new Error(`Error al subir la imagen: ${errorMessage}`);
-    }
-
-    return { secure_url: data.secure_url, public_id: data.public_id };
-};
-
 
 export function BannerManager({ storeId }: BannerManagerProps) {
     const firestore = useFirestore();
@@ -128,12 +73,9 @@ export function BannerManager({ storeId }: BannerManagerProps) {
             if (!storeRef) throw new Error("Referencia a la tienda no disponible");
 
             toast({ title: 'Subiendo nueva imagen...' });
-            const { secure_url, public_id } = await uploadImageToCloudinary(imageFile, storeId);
+            const bannerUrl = await uploadImage(imageFile);
             
-            // Ya no se elimina la imagen anterior de Cloudinary para evitar el uso del api_secret.
-            // La imagen antigua quedará huérfana en Cloudinary.
-            
-            await updateDoc(storeRef, { bannerUrl: secure_url, bannerPublicId: public_id });
+            await updateDoc(storeRef, { bannerUrl });
             
             toast({ title: '¡Banner actualizado con éxito!' });
             setImageFile(null);
@@ -147,7 +89,7 @@ export function BannerManager({ storeId }: BannerManagerProps) {
     };
 
     const handleDeleteBanner = async () => {
-         if (!firestore || !store?.bannerPublicId) {
+        if (!firestore) {
             toast({ variant: 'destructive', title: 'Error', description: 'No hay banner para eliminar.' });
             return;
         }
@@ -156,9 +98,7 @@ export function BannerManager({ storeId }: BannerManagerProps) {
 
         try {
             if (!storeRef) throw new Error("Referencia a la tienda no disponible");
-            // Ya no se elimina la imagen de Cloudinary para evitar el uso del api_secret.
-            // La imagen antigua quedará huérfana en Cloudinary.
-            await updateDoc(storeRef, { bannerUrl: "", bannerPublicId: "" });
+            await updateDoc(storeRef, { bannerUrl: "" });
             
             toast({ title: 'Banner eliminado' });
             setImageFile(null);
@@ -201,9 +141,9 @@ export function BannerManager({ storeId }: BannerManagerProps) {
                     </div>
 
                     <div className="relative mt-4 w-full aspect-[851/315] rounded-md border-2 border-dashed bg-muted flex items-center justify-center">
-                        {imagePreview ? (
-                             <Image src={imagePreview} alt="Vista previa del banner" fill className="rounded-md object-contain" />
-                        ) : (
+                            {imagePreview ? (
+                                <img src={imagePreview} alt="Vista previa del banner" className="h-full w-full rounded-md object-contain" />
+                            ) : (
                             <div className="text-center text-muted-foreground">
                                 <ImageIcon className="mx-auto h-12 w-12" />
                                 <p>Vista previa del banner</p>

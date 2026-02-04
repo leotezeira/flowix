@@ -12,24 +12,25 @@ import { SUBSCRIPTION_TEXTS, formatPrice } from '@/lib/subscription-utils';
 export function SubscriptionPaywall() {
   const { isTrialActive, daysLeftInTrial, isSubscriptionActive, status } = useSubscription();
   const auth = useAuth();
-  const [isLoadingCheckout, setIsLoadingCheckout] = useState(false);
+  const [isLoadingManualCheckout, setIsLoadingManualCheckout] = useState(false);
+  const [isLoadingAutoCheckout, setIsLoadingAutoCheckout] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleCreateCheckout = async () => {
+  const handleCreateCheckout = async (endpoint: string, setLoading: (value: boolean) => void) => {
     if (!auth?.currentUser) {
       setError('Debes iniciar sesión');
       return;
     }
 
     try {
-      setIsLoadingCheckout(true);
+      setLoading(true);
       setError(null);
 
       // Obtener el ID token del usuario
       const idToken = await auth.currentUser.getIdToken();
 
       // Llamar a la API para crear la preferencia
-      const response = await fetch('/api/mercadopago/create-preference', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -53,8 +54,17 @@ export function SubscriptionPaywall() {
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error desconocido');
-      setIsLoadingCheckout(false);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleManualCheckout = async () => {
+    await handleCreateCheckout('/api/mercadopago/create-preference', setIsLoadingManualCheckout);
+  };
+
+  const handleAutoCheckout = async () => {
+    await handleCreateCheckout('/api/mercadopago/create-preapproval', setIsLoadingAutoCheckout);
   };
 
   // Si está en prueba gratuita, no mostrar nada
@@ -91,7 +101,7 @@ export function SubscriptionPaywall() {
           <div className="space-y-2 text-sm">
             <div className="flex items-start gap-2">
               <Clock className="h-4 w-4 mt-0.5 text-green-600 flex-shrink-0" />
-              <span>Renovación automática cada 30 días</span>
+              <span>Pago manual por 30 días o suscripción automática</span>
             </div>
             <div className="flex items-start gap-2">
               <Clock className="h-4 w-4 mt-0.5 text-green-600 flex-shrink-0" />
@@ -115,14 +125,25 @@ export function SubscriptionPaywall() {
               <p className="text-2xl font-bold text-gray-900">{formatPrice()}</p>
               <p className="text-sm text-gray-600">por mes</p>
             </div>
-            <Button 
-              onClick={handleCreateCheckout}
-              disabled={isLoadingCheckout}
-              className="w-full"
-              size="lg"
-            >
-              {isLoadingCheckout ? 'Preparando pago...' : 'Ir a Mercado Pago'}
-            </Button>
+            <div className="space-y-3">
+              <Button 
+                onClick={handleManualCheckout}
+                disabled={isLoadingManualCheckout}
+                className="w-full"
+                size="lg"
+              >
+                {isLoadingManualCheckout ? 'Preparando pago...' : 'Pagar 1 mes (manual)'}
+              </Button>
+              <Button 
+                onClick={handleAutoCheckout}
+                disabled={isLoadingAutoCheckout}
+                className="w-full"
+                size="lg"
+                variant="outline"
+              >
+                {isLoadingAutoCheckout ? 'Preparando suscripción...' : 'Suscripción automática mensual'}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

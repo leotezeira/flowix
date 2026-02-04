@@ -62,10 +62,10 @@ export default function RegisterPage() {
             
             toast({
               title: "Cuenta creada",
-              description: "Te enviamos un email de verificación. Por favor, revisá tu casilla.",
+              description: "Te enviamos un email de verificación. Por favor, revisá tu casilla para confirmar tu cuenta.",
             });
             
-            router.push(`/verify-email`);
+            router.push(`/admin`);
 
         } catch (error) {
             console.error("Error during registration:", error);

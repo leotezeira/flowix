@@ -39,14 +39,7 @@ export default function LoginPage() {
             return;
         }
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
-            
-            // Verificar si el email está verificado
-            if (!userCredential.user.emailVerified) {
-                router.push('/verify-email');
-                return;
-            }
-            
+            await signInWithEmailAndPassword(auth, values.email, values.password);
             router.push(`/admin`);
 
         } catch (error) {

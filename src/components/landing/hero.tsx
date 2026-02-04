@@ -1,24 +1,10 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
-import Image from 'next/image';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export function Hero() {
-  const heroImage = PlaceHolderImages.find((img) => img.id === 'hero-image');
-
   return (
     <section className="relative w-full overflow-hidden py-20 md:py-32">
-       {heroImage && (
-        <Image
-          src={heroImage.imageUrl}
-          alt={heroImage.description}
-          fill
-          className="object-cover"
-          data-ai-hint={heroImage.imageHint}
-          priority
-        />
-      )}
       <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent" />
       <div className="container relative z-10 text-center">
         <div className="mx-auto max-w-3xl">

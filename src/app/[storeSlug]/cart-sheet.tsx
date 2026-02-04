@@ -130,8 +130,10 @@ export function CartSheet({ cart, store, isOpen, onOpenChange, onCartChange }: C
             orderSummary += `- Dirección: ${values.address}\n`;
         }
 
-        const whatsappUrl = `https://wa.me/${store.phone}?text=${encodeURIComponent(orderSummary)}`;
-        window.open(whatsappUrl, '_blank');
+        const phoneDigits = String(store.phone || '').replace(/\D/g, '');
+        if (!phoneDigits) return;
+        const whatsappUrl = `https://wa.me/${phoneDigits}?text=${encodeURIComponent(orderSummary)}`;
+        window.location.assign(whatsappUrl);
     }
 
     return (

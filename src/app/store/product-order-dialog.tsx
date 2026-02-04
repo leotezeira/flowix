@@ -10,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { Product, CartItem } from './page';
 import { Minus, Plus } from 'lucide-react';
-import Image from 'next/image';
 
 interface ProductOrderDialogProps {
   product: Product;
@@ -60,7 +59,7 @@ export function ProductOrderDialog({ product, isOpen, onOpenChange, onAddToCart 
         <DialogHeader>
           {product.imageUrl && (
             <div className="relative -mx-6 -mt-6 mb-4 h-48">
-              <Image src={product.imageUrl} alt={product.name} fill className="object-cover rounded-t-lg" />
+              <img src={product.imageUrl} alt={product.name} className="absolute inset-0 h-full w-full object-cover rounded-t-lg" />
             </div>
           )}
           <DialogTitle className="text-2xl">{product.name}</DialogTitle>

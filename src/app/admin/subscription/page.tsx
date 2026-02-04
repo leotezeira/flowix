@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { SubscriptionPaywall, TrialBanner } from '@/components/subscription/paywall';
-import { CheckCircle2, AlertCircle, Clock, Loader } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Clock, Loader, CreditCard, Repeat } from 'lucide-react';
 import { SUBSCRIPTION_TEXTS, formatPrice } from '@/lib/subscription-utils';
 
 export default function SubscriptionPage() {
@@ -20,6 +20,10 @@ export default function SubscriptionPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [processedPayment, setProcessedPayment] = useState(false);
+  const [isLoadingManual, setIsLoadingManual] = useState(false);
+  const [isLoadingAuto, setIsLoadingAuto] = useState(false);
+  const [isLoadingAdvance, setIsLoadingAdvance] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const paymentStatus = searchParams.get('status');
 
@@ -35,7 +39,10 @@ export default function SubscriptionPage() {
           const userRef = doc(db, 'users', auth.currentUser!.uid);
           
           const now = Date.now();
-          const subscriptionEnd = now + 30 * 24 * 60 * 60 * 1000; // 30 días
+          // Obtener meses del query param
+          const monthsParam = searchParams.get('months');
+          const months = monthsParam ? parseInt(monthsParam) : 1;
+          const subscriptionEnd = now + months * 30 * 24 * 60 * 60 * 1000; // X meses
 
           await updateDoc(userRef, {
             subscription: {
@@ -60,7 +67,54 @@ export default function SubscriptionPage() {
     };
 
     handlePaymentReturn();
-  }, [paymentStatus, processedPayment, auth, subscription, router]);
+  }, [paymentStatus, processedPayment, auth, subscription, router, searchParams]);
+
+  const handleCreateCheckout = async (endpoint: string, setLoading: (value: boolean) => void, months: number = 1) => {
+    if (!auth?.currentUser) {
+      setError('Debes iniciar sesión');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const idToken = await auth.currentUser.getIdToken();
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ months }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al crear el enlace de pago');
+      }
+
+      const data = await response.json();
+
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else {
+        throw new Error('No se recibió URL de checkout');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleManualCheckout = () => handleCreateCheckout('/api/mercadopago/create-preference', setIsLoadingManual, 1);
+  const handleAutoCheckout = () => handleCreateCheckout('/api/mercadopago/create-preapproval', setIsLoadingAuto, 1);
+  const handleAdvanceCheckout = (months: number) => {
+    setIsLoadingAdvance(months);
+    handleCreateCheckout('/api/mercadopago/create-preference', () => setIsLoadingAdvance(null), months);
+  };
 
   if (!user) {
     return (
@@ -194,6 +248,128 @@ export default function SubscriptionPage() {
 
         {/* Paywall si no tiene suscripción */}
         <SubscriptionPaywall />
+
+        {/* Opciones de pago y renovación */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Opciones de Pago</CardTitle>
+            <CardDescription>
+              Renueva o activa tu suscripción con diferentes modalidades
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {/* Pago Manual Mensual */}
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <CreditCard className="h-5 w-5 text-blue-600 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-lg">Pago Manual</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Paga mes a mes cuando lo necesites. Sin renovación automática.
+                  </p>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-2xl font-bold">{formatPrice()}</span>
+                    <span className="text-sm text-gray-600">por mes</span>
+                  </div>
+                </div>
+              </div>
+              <Button 
+                onClick={handleManualCheckout}
+                disabled={isLoadingManual}
+                className="w-full"
+                variant="outline"
+              >
+                {isLoadingManual ? 'Preparando pago...' : 'Pagar 1 mes'}
+              </Button>
+            </div>
+
+            {/* Suscripción Automática */}
+            <div className="border rounded-lg p-4 space-y-3 bg-blue-50 border-blue-200">
+              <div className="flex items-start gap-3">
+                <Repeat className="h-5 w-5 text-blue-600 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-lg">Suscripción Automática</h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Se renueva automáticamente cada mes. Cancela cuando quieras.
+                  </p>
+                  <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-2xl font-bold">{formatPrice()}</span>
+                    <span className="text-sm text-gray-600">por mes</span>
+                  </div>
+                </div>
+              </div>
+              <Button 
+                onClick={handleAutoCheckout}
+                disabled={isLoadingAuto}
+                className="w-full"
+              >
+                {isLoadingAuto ? 'Preparando suscripción...' : 'Activar suscripción automática'}
+              </Button>
+            </div>
+
+            {/* Pago por Adelantado */}
+            <div className="border rounded-lg p-4 space-y-4">
+              <div>
+                <h3 className="font-semibold text-lg">Pago por Adelantado</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Ahorra pagando varios meses de una vez
+                </p>
+              </div>
+              <div className="grid gap-3">
+                <div className="flex items-center justify-between p-3 border rounded hover:border-blue-400 transition-colors">
+                  <div>
+                    <p className="font-semibold">3 meses</p>
+                    <p className="text-sm text-gray-600">$15.000 total</p>
+                  </div>
+                  <Button 
+                    onClick={() => handleAdvanceCheckout(3)}
+                    disabled={isLoadingAdvance === 3}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {isLoadingAdvance === 3 ? 'Preparando...' : 'Pagar'}
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between p-3 border rounded hover:border-blue-400 transition-colors">
+                  <div>
+                    <p className="font-semibold">6 meses</p>
+                    <p className="text-sm text-gray-600">$30.000 total</p>
+                  </div>
+                  <Button 
+                    onClick={() => handleAdvanceCheckout(6)}
+                    disabled={isLoadingAdvance === 6}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {isLoadingAdvance === 6 ? 'Preparando...' : 'Pagar'}
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between p-3 border rounded hover:border-blue-400 transition-colors bg-green-50 border-green-200">
+                  <div>
+                    <p className="font-semibold">12 meses</p>
+                    <p className="text-sm text-gray-600">$60.000 total</p>
+                    <p className="text-xs text-green-700 font-medium">Recomendado</p>
+                  </div>
+                  <Button 
+                    onClick={() => handleAdvanceCheckout(12)}
+                    disabled={isLoadingAdvance === 12}
+                    variant="outline"
+                    size="sm"
+                  >
+                    {isLoadingAdvance === 12 ? 'Preparando...' : 'Pagar'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Botón para volver */}
         <Button 

@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { ShoppingCart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { CartSheet } from './cart-sheet';
-import Image from 'next/image';
 import type { VariantGroup, VariantSelection } from '@/types/variants';
 import { SimpleVariantSelector } from '@/components/products/simplified-selector';
 
@@ -192,9 +191,9 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
     const isLoadingMenu = loadingCategories || loadingProducts;
 
     return (
-        <div className="bg-background">
+        <div className="flex min-h-[100dvh] flex-col bg-background max-w-[100vw] overflow-x-hidden">
             <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur-sm">
-                <div className="container flex h-16 items-center justify-between">
+                <div className="mx-auto flex h-16 w-full max-w-[100vw] items-center justify-between px-4">
                     <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{store.name}</h1>
                     <Button variant="outline" className="relative" onClick={() => setIsCartOpen(true)}>
                         <ShoppingCart className="mr-2 h-4 w-4" />
@@ -208,15 +207,13 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
                 </div>
             </header>
 
-            <main className="container mx-auto py-8">
+            <main className="mx-auto w-full max-w-[100vw] flex-1 overflow-y-auto px-4 py-6">
                  {store.bannerUrl && (
                     <div className="relative mb-12 w-full overflow-hidden rounded-lg shadow-lg" style={{ aspectRatio: '851 / 315' }}>
-                        <Image
+                        <img
                             src={store.bannerUrl}
                             alt={`Banner de ${store.name}`}
-                            fill
-                            className="object-cover"
-                            priority
+                            className="w-full h-full object-cover"
                         />
                     </div>
                 )}
@@ -232,24 +229,57 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
                             (productsByCategory[category.id] && productsByCategory[category.id].length > 0) && (
                                 <section key={category.id}>
                                     <h2 className="text-3xl font-bold mb-6">{category.name}</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {productsByCategory[category.id].map(product => (
-                                            <Card key={product.id} className={`flex flex-col overflow-hidden transition-shadow duration-300 hover:shadow-lg ${((product.stock ?? 0) <= 0) ? 'opacity-70' : ''}`}>
-                                                {product.imageUrl && (
-                                                    <div className="relative aspect-video w-full">
-                                                        <Image src={product.imageUrl} alt={product.name} fill className="object-cover" />
+                                    <div className="flex flex-col gap-3">
+                                        {productsByCategory[category.id].map(product => {
+                                            const variantTags = (product.variants ?? []).map(variant => variant.name);
+
+                                            return (
+                                                <div
+                                                    key={product.id}
+                                                    className={`flex min-h-[96px] items-center gap-3 rounded-[10px] bg-white p-3 shadow-sm ${((product.stock ?? 0) <= 0) ? 'opacity-70' : ''}`}
+                                                >
+                                                    <div className="flex h-24 w-[72px] flex-shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                                                        {product.imageUrl ? (
+                                                            <img
+                                                                src={product.imageUrl}
+                                                                alt={product.name}
+                                                                className="h-full w-full object-contain"
+                                                            />
+                                                        ) : (
+                                                            <div className="h-full w-full" />
+                                                        )}
                                                     </div>
-                                                )}
-                                                <div className="flex flex-col flex-grow p-6">
-                                                    <CardHeader className="p-0">
-                                                        <CardTitle>{product.name}</CardTitle>
-                                                    </CardHeader>
-                                                    <CardContent className="p-0 pt-2 flex-grow">
-                                                        {product.description && <p className="text-muted-foreground mb-4 text-sm">{product.description}</p>}
-                                                    </CardContent>
-                                                    <CardFooter className="p-0 pt-4 flex items-center justify-between">
-                                                        <p className="text-xl font-semibold">${(product.basePrice || product.price).toFixed(2)}</p>
+                                                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                                                        <div className="flex min-w-0 flex-1 flex-col justify-center">
+                                                            <h3 className="line-clamp-2 text-sm font-bold uppercase text-foreground">
+                                                                {product.name}
+                                                            </h3>
+                                                            <div className="mt-1 flex items-baseline gap-1">
+                                                                <span className="text-[18px] font-bold text-foreground">
+                                                                    ${(product.basePrice || product.price).toFixed(2)}
+                                                                </span>
+                                                                <span className="text-xs font-normal text-muted-foreground">ARS</span>
+                                                            </div>
+                                                            {(variantTags.length > 0 || (product.stock ?? 0) <= 0) && (
+                                                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                                                    {variantTags.map(tag => (
+                                                                        <span
+                                                                            key={tag}
+                                                                            className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
+                                                                        >
+                                                                            {tag}
+                                                                        </span>
+                                                                    ))}
+                                                                    {(product.stock ?? 0) <= 0 && (
+                                                                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                                                                            Sin stock
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                         <Button
+                                                            className="shrink-0"
                                                             disabled={(product.stock ?? 0) <= 0}
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
@@ -259,10 +289,10 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
                                                             <ShoppingCart className="mr-2 h-4 w-4" />
                                                             {(product.stock ?? 0) <= 0 ? 'Sin stock' : 'Agregar'}
                                                         </Button>
-                                                    </CardFooter>
+                                                    </div>
                                                 </div>
-                                            </Card>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </section>
                             )

@@ -6,10 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import Image from 'next/image';
 import { Trash2, Image as ImageIcon } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { uploadImage } from '@/lib/cloudinary-upload';
 
 interface LogoManagerProps {
     storeId: string;
@@ -18,53 +18,6 @@ interface LogoManagerProps {
 type Store = {
     id: string;
     logoUrl?: string;
-    logoPublicId?: string;
-};
-
-const uploadImageToCloudinary = async (file: File, storeId: string): Promise<{ secure_url: string; public_id: string }> => {
-    const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
-    const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET?.trim();
-
-    console.log('[Cloudinary Upload] cloud_name:', cloudName);
-    console.log('[Cloudinary Upload] upload_preset:', uploadPreset);
-
-    if (!cloudName || cloudName === '') {
-        throw new Error('❌ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME está vacío o undefined en runtime');
-    }
-
-    if (!uploadPreset || uploadPreset === '') {
-        throw new Error('❌ NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET está vacío o undefined en runtime');
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', uploadPreset);
-    formData.append('folder', `stores/${storeId}/logo`);
-
-    const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
-    console.log('[Cloudinary Upload] URL:', uploadUrl);
-    console.log('[Cloudinary Upload] FormData entries:');
-    for (const [key, value] of formData.entries()) {
-        console.log(`  ${key}:`, value instanceof File ? `File(${value.name})` : value);
-    }
-
-    const response = await fetch(uploadUrl, {
-        method: 'POST',
-        body: formData,
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-        console.error('Error de Cloudinary:', data);
-        const errorMessage = data?.error?.message || 'Ocurrió un error desconocido al subir la imagen.';
-        if (errorMessage.includes('Invalid upload preset')) {
-            throw new Error('Error de Cloudinary: El "upload preset" es inválido. Asegúrate de que está bien configurado como "unsigned" en tu cuenta de Cloudinary.');
-        }
-        throw new Error(`Error al subir la imagen: ${errorMessage}`);
-    }
-
-    return { secure_url: data.secure_url, public_id: data.public_id };
 };
 
 export function LogoManager({ storeId }: LogoManagerProps) {
@@ -118,8 +71,8 @@ export function LogoManager({ storeId }: LogoManagerProps) {
         try {
             if (!storeRef) throw new Error('Referencia a la tienda no disponible');
 
-            const { secure_url, public_id } = await uploadImageToCloudinary(imageFile, storeId);
-            await updateDoc(storeRef, { logoUrl: secure_url, logoPublicId: public_id });
+            const logoUrl = await uploadImage(imageFile);
+            await updateDoc(storeRef, { logoUrl });
 
             toast({ title: '¡Logo actualizado con éxito!' });
             setImageFile(null);
@@ -185,7 +138,7 @@ export function LogoManager({ storeId }: LogoManagerProps) {
 
                     <div className="relative aspect-square w-32">
                         {imagePreview ? (
-                            <Image src={imagePreview} alt="Logo" fill className="rounded-full object-cover" />
+                            <img src={imagePreview} alt="Logo" className="rounded-full object-cover w-full h-full" />
                         ) : (
                             <div className="flex h-full w-full items-center justify-center rounded-full border border-dashed text-muted-foreground">
                                 <ImageIcon className="h-6 w-6" />

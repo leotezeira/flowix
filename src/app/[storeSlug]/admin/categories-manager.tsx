@@ -14,13 +14,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Pencil, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import Image from 'next/image';
+import { uploadImage } from '@/lib/cloudinary-upload';
 
 export type Category = {
   id: string;
   name: string;
   imageUrl?: string;
-  imagePublicId?: string;
   order?: number;
 };
 
@@ -30,57 +29,6 @@ const categoryFormSchema = z.object({
 });
 
 type CategoryFormValues = z.infer<typeof categoryFormSchema>;
-
-// Función para subir una imagen a Cloudinary
-// IMPORTANTE: Se ejecuta ÚNICAMENTE dentro de handlers de evento (onClick, onSubmit)
-const uploadImageToCloudinary = async (file: File, storeId: string): Promise<{ secure_url: string; public_id: string }> => {
-  // Validar variables SOLO dentro del handler de evento
-  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
-  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET?.trim();
-
-  // Log de debug SOLO en handler
-  console.log('[Cloudinary Upload] cloud_name:', cloudName);
-  console.log('[Cloudinary Upload] upload_preset:', uploadPreset);
-
-  if (!cloudName || cloudName === '') {
-    throw new Error('❌ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME está vacío o undefined en runtime');
-  }
-
-  if (!uploadPreset || uploadPreset === '') {
-    throw new Error('❌ NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET está vacío o undefined en runtime');
-  }
-
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('upload_preset', uploadPreset);
-  formData.append('folder', `stores/${storeId}/categories`);
-
-  const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
-  console.log('[Cloudinary Upload] URL:', uploadUrl);
-  console.log('[Cloudinary Upload] FormData entries:');
-  for (const [key, value] of formData.entries()) {
-    console.log(`  ${key}:`, value instanceof File ? `File(${value.name})` : value);
-  }
-
-  const response = await fetch(uploadUrl, {
-    method: 'POST',
-    body: formData,
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    console.error('Error de Cloudinary:', data);
-    const errorMessage = data?.error?.message || 'Ocurrió un error desconocido al subir la imagen.';
-    if (errorMessage.includes('Invalid upload preset')) {
-      throw new Error('Error de Cloudinary: El "upload preset" es inválido. Asegúrate de que está bien configurado como "unsigned" en tu cuenta de Cloudinary.');
-    }
-    throw new Error(`Error al subir la imagen: ${errorMessage}`);
-  }
-
-  return { secure_url: data.secure_url, public_id: data.public_id };
-};
-
 
 export function CategoriesManager({ storeId }: { storeId: string }) {
   const firestore = useFirestore();
@@ -246,7 +194,7 @@ export function CategoriesManager({ storeId }: { storeId: string }) {
                       </FormControl>
                       {imagePreview && (
                         <div className="relative mt-4 h-32 w-32">
-                          <Image src={imagePreview} alt="Vista previa" fill className="rounded-md object-cover" />
+                          <img src={imagePreview} alt="Vista previa" className="h-full w-full rounded-md object-cover" />
                           <Button variant="destructive" size="icon" className="absolute -right-2 -top-2 h-6 w-6 rounded-full" onClick={clearImage}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -284,9 +232,9 @@ export function CategoriesManager({ storeId }: { storeId: string }) {
                       <TableRow key={cat.id}>
                          <TableCell>
                             {cat.imageUrl ? (
-                                <Image src={cat.imageUrl} alt={cat.name} width={40} height={40} className="rounded-md object-cover" />
+                              <img src={cat.imageUrl} alt={cat.name} className="h-10 w-10 rounded-md object-cover" />
                             ) : (
-                                <div className="h-10 w-10 rounded-md bg-muted" />
+                              <div className="h-10 w-10 rounded-md bg-muted" />
                             )}
                          </TableCell>
                         <TableCell>{cat.name}</TableCell>
@@ -477,7 +425,7 @@ function CategoryEditDialog({ category, storeId, onOpenChange, onCategoryUpdated
                 </FormControl>
                 {imagePreview && (
                   <div className="relative mt-4 h-32 w-32">
-                    <Image src={imagePreview} alt="Vista previa" fill className="rounded-md object-cover" />
+                    <img src={imagePreview} alt="Vista previa" className="h-full w-full rounded-md object-cover" />
                     <Button variant="destructive" size="icon" className="absolute -right-2 -top-2 h-6 w-6 rounded-full" onClick={clearImage}>
                       <Trash2 className="h-4 w-4" />
                     </Button>

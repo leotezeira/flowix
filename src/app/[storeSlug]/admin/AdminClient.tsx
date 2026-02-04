@@ -22,6 +22,7 @@ import { CategoriesManager } from './categories-manager';
 import { ProductsManager } from './products-manager';
 import { BannerManager } from './banner-manager';
 import { LogoManager } from '@/app/admin/store/logo-manager';
+import { SubscriptionPaymentOptions } from '@/components/subscription/payment-options';
 
 type BusinessHour = {
     day: string;
@@ -677,27 +678,40 @@ export default function AdminClient() {
                     )}
 
                     {activeSection === 'suscripcion' && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Suscripción</CardTitle>
-                                <CardDescription>Gestiona tu plan y pagos</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <span className="font-medium">Estado</span>
-                                    <Badge variant={isSubscriptionActive ? 'default' : 'destructive'}>
-                                        {isSubscriptionActive ? 'Activa' : 'Vencida'}
-                                    </Badge>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="font-medium">Prueba gratuita</span>
-                                    <span className="text-sm text-muted-foreground">
-                                        {trialEndsAt ? `${Math.max(0, Math.ceil((trialEndsAt - Date.now()) / (1000 * 60 * 60 * 24)))} días restantes` : 'Sin datos'}
-                                    </span>
-                                </div>
-                                <Button onClick={handleActivateSubscription}>Pagar mensual</Button>
-                            </CardContent>
-                        </Card>
+                        <div className="space-y-6">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Estado de la Suscripción</CardTitle>
+                                    <CardDescription>Información actual de tu plan</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-medium">Estado</span>
+                                        <Badge variant={isSubscriptionActive ? 'default' : 'destructive'}>
+                                            {isSubscriptionActive ? 'Activa' : 'Vencida'}
+                                        </Badge>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-medium">Prueba gratuita</span>
+                                        <span className="text-sm text-muted-foreground">
+                                            {trialEndsAt ? `${Math.max(0, Math.ceil((trialEndsAt - Date.now()) / (1000 * 60 * 60 * 24)))} días restantes` : 'Sin datos'}
+                                        </span>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Opciones de Pago</CardTitle>
+                                    <CardDescription>
+                                        Renueva o activa tu suscripción con Mercado Pago
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <SubscriptionPaymentOptions />
+                                </CardContent>
+                            </Card>
+                        </div>
                     )}
                 </main>
             </div>

@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import type { Category } from './categories-manager';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import Image from 'next/image';
+import { uploadImage } from '@/lib/cloudinary-upload';
 import { VariantManager } from '@/components/products/variant-manager';
 import type { VariantGroup } from '@/types/variants';
 
@@ -30,7 +30,6 @@ type Product = {
   categoryId: string;
   description?: string;
   imageUrl?: string;
-  imagePublicId?: string;
   stock?: number;
   order?: number;
   variants?: VariantGroup[];
@@ -47,60 +46,6 @@ const productFormSchema = z.object({
 });
 
 type ProductFormValues = z.infer<typeof productFormSchema>;
-
-
-/**
- * Sube una imagen a Cloudinary usando un "upload preset" sin firma (unsigned).
- * IMPORTANTE: Este código se ejecuta ÚNICAMENTE dentro de handlers de evento (onClick, onSubmit).
- * No se ejecuta durante render, build ni en Server Components.
- */
-const uploadImageToCloudinary = async (file: File, storeId: string): Promise<{ secure_url: string; public_id: string }> => {
-  // Validar variables SOLO dentro del handler de evento
-  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim();
-  const uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET?.trim();
-
-  // Log de debug SOLO en handler
-  console.log('[Cloudinary Upload] cloud_name:', cloudName);
-  console.log('[Cloudinary Upload] upload_preset:', uploadPreset);
-
-  if (!cloudName || cloudName === '') {
-    throw new Error('❌ NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME está vacío o undefined en runtime');
-  }
-
-  if (!uploadPreset || uploadPreset === '') {
-    throw new Error('❌ NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET está vacío o undefined en runtime');
-  }
-
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('upload_preset', uploadPreset);
-  formData.append('folder', `stores/${storeId}/products`);
-
-  const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
-  console.log('[Cloudinary Upload] URL:', uploadUrl);
-  console.log('[Cloudinary Upload] FormData entries:');
-  for (const [key, value] of formData.entries()) {
-    console.log(`  ${key}:`, value instanceof File ? `File(${value.name})` : value);
-  }
-
-  const response = await fetch(uploadUrl, {
-    method: 'POST',
-    body: formData,
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    console.error('Error de Cloudinary:', data);
-    const errorMessage = data?.error?.message || 'Ocurrió un error desconocido al subir la imagen.';
-    if (errorMessage.includes('Invalid upload preset')) {
-      throw new Error('Error de Cloudinary: El "upload preset" es inválido. Asegúrate de que está bien configurado como "unsigned" en tu cuenta de Cloudinary.');
-    }
-    throw new Error(`Error al subir la imagen: ${errorMessage}`);
-  }
-
-  return { secure_url: data.secure_url, public_id: data.public_id };
-};
 
 
 export function ProductsManager({ storeId }: { storeId:string }) {
@@ -156,7 +101,7 @@ export function ProductsManager({ storeId }: { storeId:string }) {
     }
 
     const resizeImageFile = async (file: File, maxSize = 1200): Promise<File> => {
-      const image = new Image();
+      const image = document.createElement('img');
       const url = URL.createObjectURL(file);
       await new Promise((resolve, reject) => {
         image.onload = resolve;
@@ -215,10 +160,9 @@ export function ProductsManager({ storeId }: { storeId:string }) {
                 // Subida en segundo plano
                 (async () => {
                     try {
-                        const { secure_url, public_id } = await uploadImageToCloudinary(fileToUpload, storeId);
+                        const imageUrl = await uploadImage(fileToUpload);
                         await updateDoc(doc(firestore, 'stores', storeId, 'products', docId), {
-                            imageUrl: secure_url,
-                            imagePublicId: public_id,
+                            imageUrl,
                         });
                         toast({ title: '¡Éxito!', description: 'La imagen se subió y guardó correctamente.' });
                     } catch (imageError: any) {
@@ -323,7 +267,7 @@ export function ProductsManager({ storeId }: { storeId:string }) {
                                   </div>
                                     {imagePreview && (
                                     <div className="relative mt-4 h-32 w-32">
-                                        <Image src={imagePreview} alt="Vista previa" fill className="rounded-md object-cover" />
+                                        <img src={imagePreview} alt="Vista previa" className="h-full w-full rounded-md object-cover" />
                                         <Button variant="destructive" size="icon" className="absolute -right-2 -top-2 h-6 w-6 rounded-full" onClick={clearImage}>
                                         <Trash2 className="h-4 w-4" />
                                         </Button>
@@ -368,7 +312,7 @@ export function ProductsManager({ storeId }: { storeId:string }) {
                                         <TableRow key={prod.id}>
                                             <TableCell>
                                                 {prod.imageUrl ? (
-                                                    <Image src={prod.imageUrl} alt={prod.name} width={40} height={40} className="rounded-md object-cover" />
+                                                    <img src={prod.imageUrl} alt={prod.name} className="h-10 w-10 rounded-md object-cover" />
                                                 ) : (
                                                     <div className="h-10 w-10 rounded-md bg-muted" />
                                                 )}
@@ -494,7 +438,7 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
   }
 
     const resizeImageFile = async (file: File, maxSize = 1200): Promise<File> => {
-      const image = new Image();
+      const image = document.createElement('img');
       const url = URL.createObjectURL(file);
       await new Promise((resolve, reject) => {
         image.onload = resolve;
@@ -552,17 +496,15 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
           if (imageFile) {
             toast({ title: 'Subiendo nueva imagen...' });
             const fileToUpload = resizeImage ? await resizeImageFile(imageFile) : imageFile;
-            const { secure_url, public_id } = await uploadImageToCloudinary(fileToUpload, storeId);
+            const imageUrl = await uploadImage(fileToUpload);
             
-            // Ya no se elimina la imagen de Cloudinary para evitar el uso del api_secret.
-            
-            await updateDoc(productRef, { imageUrl: secure_url, imagePublicId: public_id });
+            await updateDoc(productRef, { imageUrl });
             toast({ title: 'Imagen actualizada con éxito' });
           } 
           // Si no hay archivo nuevo, pero se eliminó la vista previa, eliminar la imagen existente
-          else if (!imagePreview && product.imagePublicId) {
+          else if (!imagePreview && product.imageUrl) {
             toast({ title: 'Eliminando imagen...' });
-            await updateDoc(productRef, { imageUrl: "", imagePublicId: "" });
+            await updateDoc(productRef, { imageUrl: "" });
             toast({ title: 'Imagen eliminada con éxito' });
           }
         } catch (imageError: any) {
@@ -630,7 +572,7 @@ function ProductEditDialog({ product, storeId, categories, onOpenChange, onProdu
                 </div>
                 {imagePreview && (
                     <div className="relative mt-4 h-32 w-32">
-                    <Image src={imagePreview} alt="Vista previa" fill className="rounded-md object-cover" />
+                    <img src={imagePreview} alt="Vista previa" className="h-full w-full rounded-md object-cover" />
                     <Button variant="destructive" size="icon" className="absolute -right-2 -top-2 h-6 w-6 rounded-full" onClick={clearImage}>
                         <Trash2 className="h-4 w-4" />
                     </Button>

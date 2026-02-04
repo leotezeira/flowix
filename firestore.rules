@@ -24,44 +24,43 @@ service cloud.firestore {
     // Users can create their own profile.
     // Users can only read and write to their own profile.
     match /users/{userId} {
-      allow read: if isOwner(userId);
+      allow read, update, delete: if isOwner(userId);
       allow create: if isSignedIn();
-      allow update, delete: if isVerifiedOwner(userId);
     }
 
     // /stores/{storeId}
     match /stores/{storeId} {
       // Anyone can read a store's public information.
       allow read: if true;
-      // A user can create a store only if their email is verified.
-      allow create: if isVerifiedOwner(request.resource.data.ownerId);
-      // Only the verified owner of the store can update it.
-      allow update: if isVerifiedOwner(resource.data.ownerId);
+      // A user can create a store for themselves.
+      allow create: if isOwner(request.resource.data.ownerId);
+      // Only the owner of the store can update it.
+      allow update: if isOwner(resource.data.ownerId);
       // No one can delete a store.
       allow delete: if false;
 
       // /stores/{storeId}/categories/{categoryId}
       // Anyone can read categories.
-      // Only the verified store owner can create, update, or delete categories.
+      // Only the store owner can create, update, or delete categories.
       match /categories/{categoryId} {
         allow read: if true;
-        allow write: if isVerifiedOwner(get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId);
+        allow write: if isOwner(get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId);
       }
 
       // /stores/{storeId}/products/{productId}
       // Anyone can read products.
-      // Only the verified store owner can create, update, or delete products.
+      // Only the store owner can create, update, or delete products.
       match /products/{productId} {
         allow read: if true;
-        allow write: if isVerifiedOwner(get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId);
+        allow write: if isOwner(get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId);
       }
 
       // /stores/{storeId}/orders/{orderId}
       // Anyone can create an order (customers placing orders).
-      // Only the verified store owner can read, update, or delete orders.
+      // Only the store owner can read, update, or delete orders.
       match /orders/{orderId} {
         allow create: if true;
-        allow read, update, delete: if isVerifiedOwner(get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId);
+        allow read, update, delete: if isOwner(get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId);
       }
     }
   }

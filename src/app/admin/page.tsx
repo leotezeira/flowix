@@ -48,12 +48,13 @@ export default function AdminHubPage() {
   useEffect(() => {
     if (isUserLoading || !user || !firestore) return;
 
-    setLoading(true);
-    const storesRef = collection(firestore, 'stores');
-    const q = query(storesRef, where('ownerId', '==', user.uid), limit(1));
-
-    getDocs(q)
-      .then((querySnapshot) => {
+    const checkStore = async () => {
+      try {
+        setLoading(true);
+        const storesRef = collection(firestore, 'stores');
+        const q = query(storesRef, where('ownerId', '==', user.uid), limit(1));
+        const querySnapshot = await getDocs(q);
+        
         if (!querySnapshot.empty) {
           const storeDoc = querySnapshot.docs[0];
           const store = { id: storeDoc.id, ...storeDoc.data() } as Store;
@@ -61,31 +62,18 @@ export default function AdminHubPage() {
         } else {
           setLoading(false);
         }
-      })
-      .catch((error) => {
+      } catch (error) {
         console.error("Error checking for store:", error);
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: "No se pudo verificar la información de tu tienda.",
-        });
+        // Si hay error, permitir crear tienda
         setLoading(false);
-      });
-  }, [user, isUserLoading, firestore, router, toast]);
+      }
+    };
+
+    checkStore();
+  }, [user, isUserLoading, firestore, router]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user || !firestore) return;
-
-    // Verificar que el email esté verificado antes de crear la tienda
-    if (!user.emailVerified) {
-      toast({
-        variant: "destructive",
-        title: "Email no verificado",
-        description: "Necesitás verificar tu email antes de crear una tienda.",
-      });
-      router.push('/verify-email');
-      return;
-    }
 
     try {
       const storeSlug = slugify(values.storeName);
