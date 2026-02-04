@@ -124,12 +124,6 @@ export default function StoreClient({ initialStore }: { initialStore?: Store }) 
         if (!variantSelectorPending) return;
 
         const totalPrice = (variantSelectorPending.product.basePrice || variantSelectorPending.product.price) + priceModifier;
-                    if (option?.priceModifier) {
-                        totalPrice += option.priceModifier;
-                    }
-                }
-            }
-        }
 
         handleAddToCart({
             product: variantSelectorPending.product,

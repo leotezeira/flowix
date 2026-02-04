@@ -155,7 +155,6 @@ export default function StorePage() {
         if (!variantSelectorPending) return;
         
         const totalPrice = (variantSelectorPending.product.basePrice || variantSelectorPending.product.price) + priceModifier;
-        }
 
         handleAddToCart({
             product: variantSelectorPending.product,
