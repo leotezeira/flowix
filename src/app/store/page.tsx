@@ -21,6 +21,7 @@ export type Store = {
     deliveryEnabled?: boolean;
     deliveryFee?: number;
     welcomeMessage?: string;
+    giftCardActive?: boolean;
     subscription?: {
         status?: 'active' | 'past_due' | 'canceled' | 'trialing' | 'expired';
         trialEndsAt?: any;
@@ -200,6 +201,7 @@ export default function StorePage() {
 
     const trialEndsAt = resolveMillis(store.subscription?.trialEndsAt);
     const isSubscriptionActive =
+        store.giftCardActive ||
         store.subscription?.status === 'active' ||
         (store.subscription?.status === 'trialing' && trialEndsAt && Date.now() < trialEndsAt) ||
         (!store.subscription && true);

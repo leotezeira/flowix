@@ -46,6 +46,8 @@ type Store = {
     deliveryFee?: number;
     manualClosed?: boolean;
     welcomeMessage?: string;
+    giftCardActive?: boolean;
+    giftCardActivatedAt?: any;
     businessHours?: BusinessHour[];
     subscription?: {
         status?: 'active' | 'past_due' | 'canceled' | 'trialing' | 'expired';
@@ -227,6 +229,8 @@ export default function AdminStorePage() {
     const [userName, setUserName] = useState('');
     const [userPhone, setUserPhone] = useState('');
     const [savingUser, setSavingUser] = useState(false);
+    const [giftCode, setGiftCode] = useState('');
+    const [validatingGiftCode, setValidatingGiftCode] = useState(false);
 
     useEffect(() => {
         if (userProfile) {
@@ -245,6 +249,7 @@ export default function AdminStorePage() {
 
     const trialEndsAt = resolveMillis(store?.subscription?.trialEndsAt);
     const isSubscriptionActive =
+        store?.giftCardActive ||
         store?.subscription?.status === 'active' ||
         (store?.subscription?.status === 'trialing' && trialEndsAt && Date.now() < trialEndsAt) ||
         (!store?.subscription && true);
@@ -387,6 +392,55 @@ export default function AdminStorePage() {
         } catch (error) {
             console.error('Error updating subscription:', error);
             toast({ variant: 'destructive', title: 'Error', description: 'No se pudo actualizar la suscripción.' });
+        }
+    };
+
+    const handleActivateGiftCard = async () => {
+        if (!firestore || !store?.id || !giftCode) return;
+        
+        setValidatingGiftCode(true);
+        try {
+            // Validar el código con el API
+            const response = await fetch('/api/validate-gift-code', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: giftCode }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.valid) {
+                // Activar Gift Card en Firestore
+                await updateDoc(doc(firestore, 'stores', store.id), {
+                    giftCardActive: true,
+                    giftCardActivatedAt: serverTimestamp(),
+                });
+                
+                toast({ 
+                    title: '¡Gift Card activada!', 
+                    description: 'Tu tienda ahora tiene acceso gratuito permanente.' 
+                });
+                
+                setGiftCode('');
+                
+                // Recargar los datos de la tienda
+                window.location.reload();
+            } else {
+                toast({ 
+                    variant: 'destructive',
+                    title: 'Código incorrecto', 
+                    description: 'El código ingresado no es válido.' 
+                });
+            }
+        } catch (error) {
+            console.error('Error activating gift card:', error);
+            toast({ 
+                variant: 'destructive',
+                title: 'Error', 
+                description: 'No se pudo validar el código. Intenta nuevamente.' 
+            });
+        } finally {
+            setValidatingGiftCode(false);
         }
     };
 
@@ -762,6 +816,14 @@ export default function AdminStorePage() {
                                             {isSubscriptionActive ? 'Activa' : 'Vencida'}
                                         </Badge>
                                     </div>
+                                    {store.giftCardActive && (
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-medium">Gift Card</span>
+                                            <Badge variant="default" className="bg-gradient-to-r from-purple-500 to-pink-500">
+                                                🎁 Activa - Acceso Gratuito Permanente
+                                            </Badge>
+                                        </div>
+                                    )}
                                     <div className="flex items-center justify-between">
                                         <span className="font-medium">Prueba gratuita</span>
                                         <span className="text-sm text-muted-foreground">
@@ -771,17 +833,52 @@ export default function AdminStorePage() {
                                 </CardContent>
                             </Card>
 
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Opciones de Pago</CardTitle>
-                                    <CardDescription>
-                                        Renueva o activa tu suscripción con Mercado Pago
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <SubscriptionPaymentOptions />
-                                </CardContent>
-                            </Card>
+                            {!store.giftCardActive && (
+                                <Card className="border-primary/50 bg-gradient-to-br from-primary/5 to-primary/10">
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2">
+                                            🎁 Gift Cards
+                                        </CardTitle>
+                                        <CardDescription>
+                                            ¿Tenés un código de Gift Card? Activalo aquí para obtener acceso gratuito permanente.
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="flex gap-2">
+                                            <Input
+                                                placeholder="Ingresá tu código de Gift Card"
+                                                value={giftCode}
+                                                onChange={(e) => setGiftCode(e.target.value.trim())}
+                                                disabled={validatingGiftCode}
+                                            />
+                                            <Button 
+                                                onClick={handleActivateGiftCard} 
+                                                disabled={validatingGiftCode || !giftCode}
+                                                className="whitespace-nowrap"
+                                            >
+                                                {validatingGiftCode ? 'Validando...' : 'Activar'}
+                                            </Button>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Al activar un código válido, tu tienda tendrá acceso completo de forma gratuita sin límites de tiempo.
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {!store.giftCardActive && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Opciones de Pago</CardTitle>
+                                        <CardDescription>
+                                            Renueva o activa tu suscripción con Mercado Pago
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <SubscriptionPaymentOptions />
+                                    </CardContent>
+                                </Card>
+                            )}
                         </div>
                     )}
                 </main>
