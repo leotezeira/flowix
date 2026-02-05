@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore } from '@/firebase';
-import { collection, query, where, getDocs, limit, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, addDoc, serverTimestamp, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -89,7 +89,7 @@ export default function AdminHubPage() {
         subscription: {
           status: 'trialing',
           trialStartedAt: serverTimestamp(),
-          trialEndsAt: serverTimestamp(new Date(trialEndsAt)),
+          trialEndsAt: Timestamp.fromDate(new Date(trialEndsAt)),
           updatedAt: serverTimestamp(),
         },
       });
