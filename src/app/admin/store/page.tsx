@@ -7,22 +7,16 @@ import { collection, doc, getDocs, limit, query, serverTimestamp, setDoc, update
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, Phone, Printer } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Separator } from '@/components/ui/separator';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { CategoriesManager } from './categories-manager';
-import { ProductsManager } from './products-manager';
-import { BannerManager } from './banner-manager';
-import { LogoManager } from './logo-manager';
-import { SubscriptionPaymentOptions } from '@/components/subscription/payment-options';
+import { ExternalLink } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AdminDashboard, type Section } from './admin-dashboard';
+import { AdminSidebar } from './admin-sidebar';
+import { DashboardContent } from './dashboard-content';
+import { GestionContent } from './gestion-content';
+import { ProductosContent } from './productos-content';
+import { PedidosContent } from './pedidos-content';
+import { UsuarioContent } from './usuario-content';
+import { SuscripcionContent } from './suscripcion-content';
 
 type BusinessHour = {
     day: string;
@@ -112,15 +106,17 @@ export default function AdminStorePage() {
     const searchParams = useSearchParams();
     const { toast } = useToast();
 
+    // State - Store & Loading
     const [storeSlug, setStoreSlug] = useState('');
     const [store, setStore] = useState<Store | null>(null);
     const [loading, setLoading] = useState(true);
     const [isOwner, setIsOwner] = useState(false);
     const [origin, setOrigin] = useState('');
-    const [activeSection, setActiveSection] = useState<'dashboard' | 'gestion' | 'productos' | 'pedidos' | 'usuario' | 'suscripcion'>('dashboard');
-    const [periodDays, setPeriodDays] = useState('7');
-    const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
+    // State - Active Section
+    const [activeSection, setActiveSection] = useState<Section | null>(null);
+
+    // State - Business Data
     const [storeName, setStoreName] = useState('');
     const [storePhone, setStorePhone] = useState('');
     const [storeAddress, setStoreAddress] = useState('');
@@ -132,6 +128,16 @@ export default function AdminStorePage() {
     const [savingSettings, setSavingSettings] = useState(false);
     const [savingHours, setSavingHours] = useState(false);
 
+    // State - User Profile
+    const [userName, setUserName] = useState('');
+    const [userPhone, setUserPhone] = useState('');
+    const [savingUser, setSavingUser] = useState(false);
+
+    // State - Gift Card
+    const [giftCode, setGiftCode] = useState('');
+    const [validatingGiftCode, setValidatingGiftCode] = useState(false);
+
+    // Extract slug from pathname
     useEffect(() => {
         if (pathname) {
             const parts = pathname.split('/');
@@ -140,18 +146,21 @@ export default function AdminStorePage() {
         }
     }, [pathname]);
 
+    // Redirect to login if not authenticated
     useEffect(() => {
         if (!isUserLoading && !user) {
             router.push('/login');
         }
     }, [user, isUserLoading, router]);
 
+    // Set origin for sharing
     useEffect(() => {
         if (typeof window !== 'undefined') {
             setOrigin(window.location.origin);
         }
     }, []);
 
+    // Queries
     const storesQuery = useMemo(() => {
         if (!firestore || !user || !storeSlug) return null;
         return query(
@@ -162,6 +171,7 @@ export default function AdminStorePage() {
         );
     }, [firestore, user, storeSlug]);
 
+    // Check store ownership and load data
     useEffect(() => {
         if (isUserLoading || !firestore || !user || !storesQuery) return;
 
@@ -208,6 +218,7 @@ export default function AdminStorePage() {
         checkOwnership();
     }, [user, isUserLoading, firestore, storeSlug, router, toast, storesQuery]);
 
+    // Collections
     const productsQuery = useMemo(() => {
         if (!firestore || !store?.id) return null;
         return collection(firestore, 'stores', store.id, 'products');
@@ -226,16 +237,12 @@ export default function AdminStorePage() {
     }, [firestore, store?.id]);
     const { data: customers } = useCollection<Customer>(customersQuery);
 
+    // User profile
     const userProfileRef = useMemo(() => {
         if (!firestore || !user?.uid) return null;
         return doc(firestore, 'users', user.uid);
     }, [firestore, user?.uid]);
     const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
-    const [userName, setUserName] = useState('');
-    const [userPhone, setUserPhone] = useState('');
-    const [savingUser, setSavingUser] = useState(false);
-    const [giftCode, setGiftCode] = useState('');
-    const [validatingGiftCode, setValidatingGiftCode] = useState(false);
 
     useEffect(() => {
         if (userProfile) {
@@ -244,6 +251,7 @@ export default function AdminStorePage() {
         }
     }, [userProfile, user?.displayName]);
 
+    // Helper function
     const resolveMillis = (value: any) => {
         if (!value) return undefined;
         if (typeof value === 'number') return value;
@@ -252,23 +260,25 @@ export default function AdminStorePage() {
         return Number.isNaN(parsed) ? undefined : parsed;
     };
 
+    // Subscription calculation
     const trialEndsAt = resolveMillis(store?.subscription?.trialEndsAt);
     const isSubscriptionActive =
         store?.giftCardActive ||
         store?.subscription?.status === 'active' ||
         (store?.subscription?.status === 'trialing' && trialEndsAt && Date.now() < trialEndsAt);
 
+    // Force subscription section if subscription is not active
     useEffect(() => {
-        if (!isSubscriptionActive) {
+        if (!isSubscriptionActive && activeSection !== 'suscripcion') {
             setActiveSection('suscripcion');
         }
-    }, [isSubscriptionActive]);
+    }, [isSubscriptionActive, activeSection]);
 
-    // Manejar retorno de Mercado Pago
+    // Handle payment return from Mercado Pago
     useEffect(() => {
         const status = searchParams?.get('status');
         const months = searchParams?.get('months');
-        
+
         if (status === 'success' && firestore && store?.id) {
             const processPayment = async () => {
                 try {
@@ -276,7 +286,6 @@ export default function AdminStorePage() {
                     const subscriptionEndDate = new Date();
                     subscriptionEndDate.setDate(subscriptionEndDate.getDate() + monthsNum * 30);
 
-                    // Actualizar la tienda con la suscripción activa
                     await updateDoc(doc(firestore, 'stores', store.id), {
                         'subscription.status': 'active',
                         'subscription.lastPaymentDate': serverTimestamp(),
@@ -290,7 +299,6 @@ export default function AdminStorePage() {
                         description: `Tu tienda ha sido reactivada por ${monthsNum} ${monthsNum === 1 ? 'mes' : 'meses'}.`,
                     });
 
-                    // Limpiar params de la URL y recargar
                     router.replace(pathname || '/admin/store');
                     setTimeout(() => window.location.reload(), 1000);
                 } catch (error) {
@@ -320,21 +328,7 @@ export default function AdminStorePage() {
         }
     }, [searchParams, firestore, store?.id, toast, router, pathname]);
 
-    const periodNumber = Number(periodDays);
-    const periodStart = Date.now() - periodNumber * 24 * 60 * 60 * 1000;
-    const ordersInPeriod = (orders || []).filter((order) => {
-        const createdAt = resolveMillis(order.createdAt) || 0;
-        return createdAt >= periodStart;
-    });
-
-    const sortedOrders = useMemo(() => {
-        return [...(orders || [])].sort((a, b) => {
-            const aTime = resolveMillis(a.createdAt) || 0;
-            const bTime = resolveMillis(b.createdAt) || 0;
-            return bTime - aTime;
-        });
-    }, [orders]);
-
+    // Event handlers
     const handleSaveSettings = async () => {
         if (!firestore || !store?.id) return;
         setSavingSettings(true);
@@ -393,10 +387,9 @@ export default function AdminStorePage() {
 
     const handleActivateGiftCard = async () => {
         if (!firestore || !store?.id || !giftCode) return;
-        
+
         setValidatingGiftCode(true);
         try {
-            // Validar el código con el API
             const response = await fetch('/api/validate-gift-code', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -406,34 +399,31 @@ export default function AdminStorePage() {
             const data = await response.json();
 
             if (response.ok && data.valid) {
-                // Activar Gift Card en Firestore
                 await updateDoc(doc(firestore, 'stores', store.id), {
                     giftCardActive: true,
                     giftCardActivatedAt: serverTimestamp(),
                 });
-                
-                toast({ 
-                    title: 'Gift Card activada', 
-                    description: 'El código se aplicó correctamente.' 
+
+                toast({
+                    title: 'Gift Card activada',
+                    description: 'El código se aplicó correctamente.'
                 });
-                
+
                 setGiftCode('');
-                
-                // Recargar los datos de la tienda
                 window.location.reload();
             } else {
-                toast({ 
+                toast({
                     variant: 'destructive',
-                    title: 'Código incorrecto', 
-                    description: 'El código ingresado no es válido.' 
+                    title: 'Código incorrecto',
+                    description: 'El código ingresado no es válido.'
                 });
             }
         } catch (error) {
             console.error('Error activating gift card:', error);
-            toast({ 
+            toast({
                 variant: 'destructive',
-                title: 'Error', 
-                description: 'No se pudo validar el código. Intenta nuevamente.' 
+                title: 'Error',
+                description: 'No se pudo validar el código. Intenta nuevamente.'
             });
         } finally {
             setValidatingGiftCode(false);
@@ -455,12 +445,31 @@ export default function AdminStorePage() {
         return isOpenByHours ? 'Abierto' : 'Cerrado';
     };
 
+    // Loading states
     if (isUserLoading || !user) {
-        return <div className="flex h-screen items-center justify-center">Cargando...</div>;
+        return (
+            <div className="flex h-screen items-center justify-center bg-gray-50">
+                <div className="text-center">
+                    <div className="inline-block">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                    </div>
+                    <p className="mt-4 text-muted-foreground">Cargando...</p>
+                </div>
+            </div>
+        );
     }
 
     if (loading || !store) {
-        return <div className="flex h-screen items-center justify-center">Cargando panel de administración...</div>;
+        return (
+            <div className="flex h-screen items-center justify-center bg-gray-50">
+                <div className="text-center">
+                    <div className="inline-block">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                    </div>
+                    <p className="mt-4 text-muted-foreground">Cargando panel de administración...</p>
+                </div>
+            </div>
+        );
     }
 
     if (!isOwner) {
@@ -469,473 +478,176 @@ export default function AdminStorePage() {
 
     const blockUI = !isSubscriptionActive;
 
-    return (
-        <div className="container mx-auto py-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold">Panel de {store.name}</h1>
-                    <p className="mt-2 text-muted-foreground">Administrá tu tienda con un flujo claro y simple.</p>
-                </div>
-                <Button asChild variant="outline" className="shrink-0">
-                    <Link href={`/store/${store.slug}`} target="_blank">
-                        Ver mi tienda <ExternalLink className="ml-2" />
-                    </Link>
-                </Button>
-            </div>
-
-            <div className="mt-4 rounded-lg border bg-card p-3">
-                <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
-                    <span>Tu link para compartir:</span>
-                    <Link href={`/store/${store.slug}`} target="_blank" className="font-medium text-primary underline-offset-4 hover:underline">
-                        {origin ? `${origin}/store/${store.slug}` : 'Cargando...'}
-                    </Link>
-                </p>
-            </div>
-
-            {blockUI && (
-                <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-                    {store?.subscription?.status === 'expired' 
-                        ? 'Tu período de prueba venció. Debes abonar para seguir utilizando el servicio.'
-                        : 'Tu suscripción venció. Solo podés acceder a la sección de Suscripción.'}
-                </div>
-            )}
-
-            <div className="mt-6 flex flex-col gap-6 lg:flex-row">
-                <aside className="lg:w-64">
-                    <div className="space-y-2">
-                        {[
-                            { id: 'dashboard', label: 'Dashboard' },
-                            { id: 'gestion', label: 'Gestión' },
-                            { id: 'productos', label: 'Productos' },
-                            { id: 'pedidos', label: 'Pedidos' },
-                            { id: 'usuario', label: 'Usuario' },
-                            { id: 'suscripcion', label: 'Suscripción' },
-                        ].map((item) => (
-                            <Button
-                                key={item.id}
-                                variant={activeSection === item.id ? 'default' : 'outline'}
-                                className="w-full justify-start"
-                                disabled={blockUI && item.id !== 'suscripcion'}
-                                onClick={() => setActiveSection(item.id as any)}
-                            >
-                                {item.label}
-                            </Button>
-                        ))}
+    // Render
+    if (activeSection === null) {
+        // Dashboard Home View
+        return (
+            <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-8 px-4">
+                <div className="max-w-7xl mx-auto space-y-8">
+                    {/* Header with store info */}
+                    <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+                        <div>
+                            <h1 className="text-4xl lg:text-5xl font-black tracking-tight">
+                                {store.name}
+                            </h1>
+                            <p className="text-lg text-muted-foreground mt-3">
+                                Bienvenido a tu panel de control
+                            </p>
+                        </div>
+                        <Button asChild variant="outline" className="shrink-0 lg:self-auto">
+                            <Link href={`/store/${store.slug}`} target="_blank">
+                                Ver mi tienda <ExternalLink className="ml-2 h-4 w-4" />
+                            </Link>
+                        </Button>
                     </div>
-                </aside>
 
-                <main className="flex-1 space-y-6">
-                    {activeSection === 'dashboard' && (
-                        <div className="space-y-6">
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Pedidos</CardTitle>
-                                        <CardDescription>Cantidad en el período seleccionado</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-3">
-                                        <Select value={periodDays} onValueChange={setPeriodDays}>
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="7">Últimos 7 días</SelectItem>
-                                                <SelectItem value="30">Últimos 30 días</SelectItem>
-                                                <SelectItem value="90">Últimos 90 días</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <div className="text-4xl font-bold">{ordersInPeriod.length}</div>
-                                    </CardContent>
-                                </Card>
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Productos</CardTitle>
-                                        <CardDescription>Cantidad total publicada</CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="text-4xl font-bold">{products?.length || 0}</div>
-                                    </CardContent>
-                                </Card>
-                            </div>
+                    {/* Sharing link */}
+                    <Card className="border-dashed">
+                        <CardContent className="pt-6">
+                            <p className="text-sm text-muted-foreground mb-2">Tu link para compartir:</p>
+                            <Link
+                                href={`/store/${store.slug}`}
+                                target="_blank"
+                                className="font-mono text-sm bg-muted px-4 py-2 rounded-lg inline-block hover:bg-muted/80 transition-colors"
+                            >
+                                {origin ? `${origin}/store/${store.slug}` : 'Cargando...'}
+                            </Link>
+                        </CardContent>
+                    </Card>
 
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Horarios del negocio</CardTitle>
-                                    <CardDescription>Configura los horarios por día</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    {businessHours.map((hour, index) => (
-                                        <div key={hour.day} className="flex flex-col gap-2 border-b pb-3 last:border-b-0">
-                                            <div className="flex items-center justify-between">
-                                                <div className="font-medium">{hour.day}</div>
-                                                <Switch
-                                                    checked={hour.enabled}
-                                                    onCheckedChange={(checked) => {
-                                                        const next = [...businessHours];
-                                                        next[index] = { ...hour, enabled: checked };
-                                                        setBusinessHours(next);
-                                                    }}
-                                                />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-2">
-                                                <Input
-                                                    type="time"
-                                                    value={hour.open}
-                                                    onChange={(e) => {
-                                                        const next = [...businessHours];
-                                                        next[index] = { ...hour, open: e.target.value };
-                                                        setBusinessHours(next);
-                                                    }}
-                                                    disabled={!hour.enabled}
-                                                />
-                                                <Input
-                                                    type="time"
-                                                    value={hour.close}
-                                                    onChange={(e) => {
-                                                        const next = [...businessHours];
-                                                        next[index] = { ...hour, close: e.target.value };
-                                                        setBusinessHours(next);
-                                                    }}
-                                                    disabled={!hour.enabled}
-                                                />
-                                            </div>
-                                        </div>
-                                    ))}
-                                    <Button onClick={handleSaveHours} disabled={savingHours}>
-                                        {savingHours ? 'Guardando...' : 'Guardar horarios'}
-                                    </Button>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Base de clientes</CardTitle>
-                                    <CardDescription>Nombre y teléfono</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    {customers && customers.length > 0 ? (
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Nombre</TableHead>
-                                                    <TableHead>Teléfono</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {customers.map((customer) => (
-                                                    <TableRow key={customer.id}>
-                                                        <TableCell>{customer.name || '-'}</TableCell>
-                                                        <TableCell>{customer.phone || '-'}</TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">No hay clientes registrados aún.</p>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
-
-                    {activeSection === 'gestion' && (
-                        <div className="space-y-6">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Datos del negocio</CardTitle>
-                                    <CardDescription>Configura la información principal</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <Input
-                                            placeholder="Nombre del negocio"
-                                            value={storeName}
-                                            onChange={(e) => setStoreName(e.target.value)}
-                                        />
-                                        <Input
-                                            placeholder="Teléfono"
-                                            value={storePhone}
-                                            onChange={(e) => setStorePhone(e.target.value)}
-                                        />
-                                    </div>
-                                    <Textarea
-                                        placeholder="Dirección del local"
-                                        value={storeAddress}
-                                        onChange={(e) => setStoreAddress(e.target.value)}
-                                    />
-                                    <div>
-                                        <label className="text-sm font-medium mb-2 block">Mensaje de bienvenida</label>
-                                        <Textarea
-                                            placeholder="Ej: ¡Bienvenido a nuestra tienda! Hacemos envíos a todo el país."
-                                            value={welcomeMessage}
-                                            onChange={(e) => setWelcomeMessage(e.target.value)}
-                                            rows={3}
-                                        />
-                                        <p className="text-xs text-muted-foreground mt-1">Este mensaje se mostrará en la página principal de tu tienda.</p>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="font-medium">Envío a domicilio</p>
-                                            <p className="text-sm text-muted-foreground">Activa el envío y configura el precio.</p>
-                                        </div>
-                                        <Switch checked={deliveryEnabled} onCheckedChange={setDeliveryEnabled} />
-                                    </div>
-                                    {deliveryEnabled && (
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            step={0.01}
-                                            value={deliveryFee}
-                                            onChange={(e) => setDeliveryFee(Number(e.target.value))}
-                                            placeholder="Precio de envío"
-                                        />
-                                    )}
-                                    <Separator />
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="font-medium">Estado del negocio</p>
-                                            <p className="text-sm text-muted-foreground">Apertura automática según horarios + cierre manual.</p>
-                                        </div>
-                                        <Badge>{getBusinessStatus()}</Badge>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="font-medium">Cierre manual</p>
-                                            <p className="text-sm text-muted-foreground">Fuerza el cierre aunque esté en horario.</p>
-                                        </div>
-                                        <Switch checked={manualClosed} onCheckedChange={setManualClosed} />
-                                    </div>
-                                    <Button onClick={handleSaveSettings} disabled={savingSettings}>
-                                        {savingSettings ? 'Guardando...' : 'Guardar cambios'}
-                                    </Button>
-                                </CardContent>
-                            </Card>
-
-                            <div className="grid gap-6 lg:grid-cols-2">
-                                <LogoManager storeId={store.id} />
-                                <BannerManager storeId={store.id} />
-                            </div>
-                        </div>
-                    )}
-
-                    {activeSection === 'productos' && (
-                        <Tabs defaultValue="products">
-                            <TabsList className="grid w-full grid-cols-2 md:w-[320px]">
-                                <TabsTrigger value="products">Productos</TabsTrigger>
-                                <TabsTrigger value="categories">Categorías</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="products">
-                                <ProductsManager storeId={store.id} />
-                            </TabsContent>
-                            <TabsContent value="categories">
-                                <CategoriesManager storeId={store.id} />
-                            </TabsContent>
-                        </Tabs>
-                    )}
-
-                    {activeSection === 'pedidos' && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Pedidos recibidos</CardTitle>
-                                <CardDescription>Registro histórico de pedidos</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                {sortedOrders.length > 0 ? (
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Fecha</TableHead>
-                                                <TableHead>Cliente</TableHead>
-                                                <TableHead>Total</TableHead>
-                                                <TableHead>Estado</TableHead>
-                                                <TableHead className="text-right">Acciones</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {sortedOrders.map((order) => (
-                                                <TableRow key={order.id}>
-                                                    <TableCell>
-                                                        {resolveMillis(order.createdAt)
-                                                            ? new Date(resolveMillis(order.createdAt) || 0).toLocaleString()
-                                                            : '-'}
-                                                    </TableCell>
-                                                    <TableCell>{order.customerName || '-'}</TableCell>
-                                                    <TableCell>${(order.total || 0).toFixed(2)}</TableCell>
-                                                    <TableCell>
-                                                        <Badge variant="outline">{order.status || 'nuevo'}</Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-right space-x-2">
-                                                        <Button size="sm" variant="outline" onClick={() => setSelectedOrder(order)}>Ver</Button>
-                                                        {order.customerPhone && (
-                                                            <Button size="sm" variant="ghost" onClick={() => window.open(`https://wa.me/${order.customerPhone}`, '_blank')}>
-                                                                <Phone className="h-4 w-4" />
-                                                            </Button>
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">No hay pedidos todavía.</p>
-                                )}
+                    {/* Subscription warning */}
+                    {blockUI && (
+                        <Card className="border-destructive/40 bg-destructive/5">
+                            <CardContent className="pt-6">
+                                <p className="text-sm text-destructive">
+                                    {store?.subscription?.status === 'expired'
+                                        ? '⚠️ Tu período de prueba venció. Debes abonar para seguir utilizando el servicio.'
+                                        : '⚠️ Tu suscripción venció. Solo podés acceder a la sección de Suscripción.'}
+                                </p>
                             </CardContent>
                         </Card>
                     )}
 
-                    {activeSection === 'usuario' && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Datos del dueño</CardTitle>
-                                <CardDescription>Actualiza tu información personal</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <Input placeholder="Nombre" value={userName} onChange={(e) => setUserName(e.target.value)} />
-                                <Input placeholder="Teléfono" value={userPhone} onChange={(e) => setUserPhone(e.target.value)} />
-                                <Input placeholder="Email" value={user?.email || ''} disabled />
-                                <Button onClick={handleSaveUser} disabled={savingUser}>
-                                    {savingUser ? 'Guardando...' : 'Guardar datos'}
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {activeSection === 'suscripcion' && (
-                        <div className="space-y-6">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Estado de la Suscripción</CardTitle>
-                                    <CardDescription>Información actual de tu plan</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-medium">Estado</span>
-                                        <Badge variant={isSubscriptionActive ? 'default' : 'destructive'}>
-                                            {isSubscriptionActive ? 'Activa' : 'Vencida'}
-                                        </Badge>
-                                    </div>
-                                    {store.giftCardActive && (
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-medium">Gift Card</span>
-                                            <Badge variant="default" className="bg-gradient-to-r from-purple-500 to-pink-500">
-                                                🎁 Activa
-                                            </Badge>
-                                        </div>
-                                    )}
-                                    {store?.subscription?.status === 'trialing' && (
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-medium">Período de prueba</span>
-                                            <span className="text-sm font-medium text-blue-600">
-                                                {trialEndsAt ? `${Math.max(0, Math.ceil((trialEndsAt - Date.now()) / (1000 * 60 * 60 * 24)))} días restantes` : 'Sin datos'}
-                                            </span>
-                                        </div>
-                                    )}
-                                    {store?.subscription?.status === 'active' && store?.subscription?.nextBillingDate && (
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-medium">Próximo pago</span>
-                                            <span className="text-sm text-muted-foreground">
-                                                {new Date(typeof store.subscription.nextBillingDate === 'number' 
-                                                    ? store.subscription.nextBillingDate 
-                                                    : store.subscription.nextBillingDate?.toDate?.() || 0).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            {!isSubscriptionActive && !store.giftCardActive && (
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Renovar Suscripción</CardTitle>
-                                        <CardDescription>
-                                            Seleccioná un plan para reactivar tu tienda
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <SubscriptionPaymentOptions />
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            {!store.giftCardActive && (
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Gift Card</CardTitle>
-                                        <CardDescription>
-                                            Ingresá tu código de Gift Card
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <div className="flex gap-2">
-                                            <Input
-                                                placeholder="Código de Gift Card"
-                                                value={giftCode}
-                                                onChange={(e) => setGiftCode(e.target.value.trim())}
-                                                disabled={validatingGiftCode}
-                                            />
-                                            <Button 
-                                                onClick={handleActivateGiftCard} 
-                                                disabled={validatingGiftCode || !giftCode}
-                                                className="whitespace-nowrap"
-                                            >
-                                                {validatingGiftCode ? 'Validando...' : 'Activar'}
-                                            </Button>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )}
-                        </div>
-                    )}
-                </main>
+                    {/* Dashboard Cards */}
+                    <AdminDashboard
+                        onSelectSection={setActiveSection}
+                        stats={{
+                            productsCount: products?.length || 0,
+                            ordersCount: orders?.length || 0,
+                            customersCount: customers?.length || 0,
+                        }}
+                    />
+                </div>
             </div>
+        );
+    }
 
-            <Dialog open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Detalle del pedido</DialogTitle>
-                    </DialogHeader>
-                    {selectedOrder ? (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="font-medium">Cliente</p>
-                                    <p className="text-sm text-muted-foreground">{selectedOrder.customerName || '-'}</p>
-                                    <p className="text-sm text-muted-foreground">{selectedOrder.customerPhone || '-'}</p>
-                                </div>
-                                <div className="text-right">
-                                    <p className="text-sm text-muted-foreground">Total</p>
-                                    <p className="text-xl font-bold">${(selectedOrder.total || 0).toFixed(2)}</p>
-                                </div>
+    // Section View with Sidebar
+    return (
+        <div className="min-h-screen bg-gray-50 py-8 px-4">
+            <div className="max-w-7xl mx-auto">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+                    <div>
+                        <h1 className="text-3xl font-bold">{store.name}</h1>
+                        <p className="text-muted-foreground mt-1">Panel de administración</p>
+                    </div>
+                    <Button asChild variant="outline">
+                        <Link href={`/store/${store.slug}`} target="_blank">
+                            Ver tienda <ExternalLink className="ml-2 h-4 w-4" />
+                        </Link>
+                    </Button>
+                </div>
+
+                {/* Main Layout: Sidebar + Content */}
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+                    {/* Sidebar - Hidden on mobile, visible on lg */}
+                    <div className="lg:col-span-1">
+                        <AdminSidebar
+                            activeSection={activeSection}
+                            onBack={() => setActiveSection(null)}
+                            isSubscriptionActive={isSubscriptionActive}
+                        />
+                    </div>
+
+                    {/* Content - Full width on mobile, 3 cols on lg */}
+                    <div className="lg:col-span-3">
+                        {/* Block UI overlay for expired subscriptions */}
+                        {blockUI && activeSection !== 'suscripcion' && (
+                            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                                Tu suscripción ha expirado. Solo puedes acceder a la sección de Suscripción.
                             </div>
-                            <Separator />
-                            <div className="space-y-2">
-                                {selectedOrder.items?.map((item, index) => (
-                                    <div key={`${item.productId}-${index}`} className="border-b pb-2">
-                                        <p className="font-medium">{item.quantity}x {item.name}</p>
-                                        <div className="text-sm text-muted-foreground">
-                                            {item.variants && Object.entries(item.variants).map(([variant, options]) => (
-                                                <div key={variant}>
-                                                    <span className="font-medium">{variant}:</span> {options.join(', ')}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="flex gap-2">
-                                <Button variant="outline" onClick={() => window.print()}>
-                                    <Printer className="mr-2 h-4 w-4" /> Imprimir
-                                </Button>
-                                {selectedOrder.customerPhone && (
-                                    <Button onClick={() => window.open(`https://wa.me/${selectedOrder.customerPhone}`, '_blank')}>
-                                        <Phone className="mr-2 h-4 w-4" /> WhatsApp
-                                    </Button>
+                        )}
+
+                        {/* Content Sections */}
+                        {blockUI && activeSection !== 'suscripcion' ? (
+                            <Card>
+                                <CardContent className="pt-6 text-center">
+                                    <p className="text-muted-foreground">Esta sección está bloqueada. Ve a Suscripción para renovar tu plan.</p>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <>
+                                {activeSection === 'productos' && (
+                                    <ProductosContent storeId={store.id} />
                                 )}
-                            </div>
-                        </div>
-                    ) : null}
-                </DialogContent>
-            </Dialog>
+
+                                {activeSection === 'pedidos' && orders && (
+                                    <PedidosContent orders={orders} resolveMillis={resolveMillis} />
+                                )}
+
+                                {activeSection === 'usuario' && (
+                                    <UsuarioContent
+                                        userName={userName}
+                                        userPhone={userPhone}
+                                        userEmail={user?.email || ''}
+                                        onUserName={setUserName}
+                                        onUserPhone={setUserPhone}
+                                        onSave={handleSaveUser}
+                                        onSaving={savingUser}
+                                    />
+                                )}
+
+                                {activeSection === 'suscripcion' && (
+                                    <SuscripcionContent
+                                        subscription={store.subscription || null}
+                                        giftCardActive={store.giftCardActive || false}
+                                        isSubscriptionActive={isSubscriptionActive}
+                                        trialEndsAt={trialEndsAt}
+                                        giftCode={giftCode}
+                                        onGiftCode={setGiftCode}
+                                        onActivateGiftCard={handleActivateGiftCard}
+                                        onValidatingGiftCard={validatingGiftCode}
+                                    />
+                                )}
+
+                                {activeSection === 'gestion' && (
+                                    <GestionContent
+                                        storeName={storeName}
+                                        storePhone={storePhone}
+                                        storeAddress={storeAddress}
+                                        deliveryEnabled={deliveryEnabled}
+                                        deliveryFee={deliveryFee}
+                                        welcomeMessage={welcomeMessage}
+                                        manualClosed={manualClosed}
+                                        businessStatus={getBusinessStatus()}
+                                        storeId={store.id}
+                                        onStoreName={setStoreName}
+                                        onStorePhone={setStorePhone}
+                                        onStoreAddress={setStoreAddress}
+                                        onDeliveryEnabled={setDeliveryEnabled}
+                                        onDeliveryFee={setDeliveryFee}
+                                        onWelcomeMessage={setWelcomeMessage}
+                                        onManualClosed={setManualClosed}
+                                        onSave={handleSaveSettings}
+                                        onSaving={savingSettings}
+                                    />
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }
