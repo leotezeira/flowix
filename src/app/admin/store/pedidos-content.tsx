@@ -122,63 +122,106 @@ export function PedidosContent({ orders, resolveMillis }: PedidosContentProps) {
       {/* Order Detail Dialog */}
       <Dialog open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
         <DialogContent className="max-w-2xl">
-          <DialogHeader>
+          <DialogHeader className="no-print">
             <DialogTitle>Detalle del pedido</DialogTitle>
           </DialogHeader>
           {selectedOrder ? (
-            <div className="space-y-4">
-              {/* Customer Info */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-sm">Cliente</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {selectedOrder.customerName || '-'}
+            <>
+              {/* Printable Area */}
+              <div id="printable-order" className="space-y-4">
+                {/* Print Header */}
+                <div className="print-only hidden">
+                  <h1 className="text-2xl font-bold mb-2">PEDIDO</h1>
+                  <p className="text-sm text-gray-600">
+                    Fecha: {resolveMillis(selectedOrder.createdAt)
+                      ? new Date(resolveMillis(selectedOrder.createdAt) || 0).toLocaleString('es-ES', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })
+                      : '-'}
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedOrder.customerPhone || '-'}
+                  <p className="text-sm text-gray-600 mb-4">
+                    ID: {selectedOrder.id.substring(0, 8)}
                   </p>
+                  <hr className="my-4 border-gray-300" />
                 </div>
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground mb-1">Total</p>
-                  <p className="text-2xl font-bold">
-                    ${(selectedOrder.total || 0).toFixed(2)}
-                  </p>
-                </div>
-              </div>
 
-              <Separator />
-
-              {/* Items */}
-              <div className="space-y-3">
-                <p className="font-medium text-sm">Productos:</p>
-                {selectedOrder.items?.map((item, index) => (
-                  <div key={`${item.productId}-${index}`} className="border-b pb-3 last:border-b-0">
-                    <div className="flex justify-between">
-                      <span>
-                        <span className="font-medium">{item.quantity}x</span> {item.name}
-                      </span>
-                      <span className="font-medium">
-                        ${item.totalPrice.toFixed(2)}
-                      </span>
-                    </div>
-                    {item.variants && Object.keys(item.variants).length > 0 && (
-                      <div className="text-xs text-muted-foreground mt-1 ml-4">
-                        {Object.entries(item.variants).map(([variant, options]) => (
-                          <div key={variant}>
-                            <span className="font-medium">{variant}:</span>{' '}
-                            {options.join(', ')}
-                          </div>
-                        ))}
-                      </div>
+                {/* Customer Info */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-sm">Cliente</p>
+                    <p className="text-sm text-muted-foreground mt-1 print:text-gray-700">
+                      {selectedOrder.customerName || '-'}
+                    </p>
+                    <p className="text-sm text-muted-foreground print:text-gray-700">
+                      {selectedOrder.customerPhone || '-'}
+                    </p>
+                    {selectedOrder.deliveryMethod && (
+                      <p className="text-sm text-muted-foreground mt-1 print:text-gray-700">
+                        <span className="font-medium">Método:</span> {selectedOrder.deliveryMethod}
+                      </p>
+                    )}
+                    {selectedOrder.address && (
+                      <p className="text-sm text-muted-foreground print:text-gray-700">
+                        <span className="font-medium">Dirección:</span> {selectedOrder.address}
+                      </p>
                     )}
                   </div>
-                ))}
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground mb-1 print:text-gray-700">Total</p>
+                    <p className="text-2xl font-bold print:text-3xl">
+                      ${(selectedOrder.total || 0).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+
+                <Separator className="print:border-gray-300" />
+
+                {/* Items */}
+                <div className="space-y-3">
+                  <p className="font-medium text-sm print:text-base print:font-bold">Productos:</p>
+                  {selectedOrder.items?.map((item, index) => (
+                    <div key={`${item.productId}-${index}`} className="border-b pb-3 last:border-b-0 print:border-gray-300">
+                      <div className="flex justify-between">
+                        <span className="print:text-base">
+                          <span className="font-medium">{item.quantity}x</span> {item.name}
+                        </span>
+                        <span className="font-medium print:text-base">
+                          ${item.totalPrice.toFixed(2)}
+                        </span>
+                      </div>
+                      {item.variants && Object.keys(item.variants).length > 0 && (
+                        <div className="text-xs text-muted-foreground mt-1 ml-4 print:text-sm print:text-gray-600">
+                          {Object.entries(item.variants).map(([variant, options]) => (
+                            <div key={variant}>
+                              <span className="font-medium">{variant}:</span>{' '}
+                              {options.join(', ')}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <Separator className="print:border-gray-300 print:border-2" />
+
+                {/* Print Footer */}
+                <div className="print-only hidden">
+                  <div className="text-right text-lg font-bold mt-4">
+                    <p>TOTAL: ${(selectedOrder.total || 0).toFixed(2)}</p>
+                  </div>
+                  <div className="mt-8 text-center text-sm text-gray-500">
+                    <p>¡Gracias por tu compra!</p>
+                  </div>
+                </div>
               </div>
 
-              <Separator />
-
-              {/* Actions */}
-              <div className="flex gap-2">
+              {/* Actions - No Print */}
+              <div className="flex gap-2 no-print">
                 <Button variant="outline" onClick={() => window.print()} className="gap-2">
                   <Printer className="h-4 w-4" />
                   Imprimir
@@ -198,10 +241,83 @@ export function PedidosContent({ orders, resolveMillis }: PedidosContentProps) {
                   </Button>
                 )}
               </div>
-            </div>
+            </>
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {/* Print Styles */}
+      <style jsx global>{`
+        @media print {
+          /* Ocultar todo excepto el contenido del pedido */
+          body * {
+            visibility: hidden;
+          }
+          
+          #printable-order,
+          #printable-order * {
+            visibility: visible;
+          }
+          
+          #printable-order {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            padding: 20px;
+          }
+
+          /* Mostrar elementos solo para impresión */
+          .print-only {
+            display: block !important;
+          }
+
+          /* Ocultar elementos que no deben imprimirse */
+          .no-print {
+            display: none !important;
+          }
+
+          /* Ajustar estilos para impresión */
+          .print\\:text-gray-700 {
+            color: #374151 !important;
+          }
+
+          .print\\:text-gray-600 {
+            color: #4b5563 !important;
+          }
+
+          .print\\:text-base {
+            font-size: 1rem !important;
+          }
+
+          .print\\:text-3xl {
+            font-size: 1.875rem !important;
+          }
+
+          .print\\:font-bold {
+            font-weight: 700 !important;
+          }
+
+          .print\\:border-gray-300 {
+            border-color: #d1d5db !important;
+          }
+
+          .print\\:border-2 {
+            border-width: 2px !important;
+          }
+
+          /* Quitar colores de fondo */
+          * {
+            background: white !important;
+            color: black !important;
+          }
+
+          /* Mantener bordes visibles */
+          .border-b {
+            border-bottom: 1px solid #e5e7eb !important;
+          }
+        }
+      `}</style>
     </>
   );
 }
