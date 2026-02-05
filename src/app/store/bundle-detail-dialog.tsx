@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { AlertTriangle } from 'lucide-react';
@@ -162,14 +161,14 @@ export function BundleDetailDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl flex flex-col max-h-[85vh]">
-        <DialogHeader className="px-6 pt-6 pb-0">
+      <DialogContent className="max-w-2xl p-0 flex flex-col max-h-[90vh]">
+        <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b">
           <DialogTitle>{product.name}</DialogTitle>
           <DialogDescription>Configurá tu pack seleccionando productos y variantes para cada ítem</DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1">
-          <div className="space-y-4 px-6 py-4 pb-6">
+        <div className="flex-1 overflow-y-auto">
+          <div className="space-y-4 px-6 py-4">
             <p className="text-sm text-muted-foreground">
               Arma tu pack de {itemCount} ítems. Precio fijo: ${product.price.toFixed(2)}
             </p>
@@ -250,9 +249,9 @@ export function BundleDetailDialog({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
-        <DialogFooter className="px-6 py-4 border-t">
+        <DialogFooter className="flex-shrink-0 px-6 py-4 border-t">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
