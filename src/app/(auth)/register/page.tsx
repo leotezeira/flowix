@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { FirebaseError } from "firebase/app";
 import { useAuth, useFirestore } from "@/firebase";
 
@@ -51,14 +51,30 @@ export default function RegisterPage() {
             const user = userCredential.user;
 
             await setDoc(doc(firestore, "users", user.uid), {
-              name: values.name,
+              displayName: values.name,
               email: values.email,
               emailVerified: false,
-              createdAt: new Date().toISOString(),
+              role: 'store_owner',
+              isActive: true,
+              isHidden: false,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              lastLoginAt: null,
+              metadata: {
+                createdBy: 'self',
+              },
             });
             
             // Enviar email de verificación
             await sendEmailVerification(user);
+
+            const idToken = await user.getIdToken();
+            await fetch('/api/auth/session', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${idToken}`,
+              },
+            });
             
             toast({
               title: "Cuenta creada",

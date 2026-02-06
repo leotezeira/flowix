@@ -12,6 +12,18 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email_verified == true;
     }
 
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isActiveUser() {
+      return isSignedIn() && userDoc().data.isActive == true;
+    }
+
+    function isSuperAdmin() {
+      return isActiveUser() && userDoc().data.role == 'super_admin';
+    }
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
@@ -20,12 +32,17 @@ service cloud.firestore {
       return isEmailVerified() && request.auth.uid == userId;
     }
 
+    function isStoreOwner(storeId) {
+      return isSignedIn() && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId == request.auth.uid;
+    }
+
     // /users/{userId}
     // Users can create their own profile.
     // Users can only read and write to their own profile.
     match /users/{userId} {
-      allow read, update, delete: if isOwner(userId);
-      allow create: if isSignedIn();
+      allow read, update: if isOwner(userId) || isSuperAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isSuperAdmin() && resource.data.isHidden != true;
     }
 
     // /stores/{storeId}
@@ -33,18 +50,18 @@ service cloud.firestore {
       // Anyone can read a store's public information.
       allow read: if true;
       // A user can create a store for themselves.
-      allow create: if isOwner(request.resource.data.ownerId);
-      // Only the owner of the store can update it.
-      allow update: if isOwner(resource.data.ownerId);
-      // No one can delete a store.
-      allow delete: if false;
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      // Only the owner of the store or super admin can update it.
+      allow update: if isStoreOwner(storeId) || isSuperAdmin();
+      // Only super admin can delete a store (hard delete).
+      allow delete: if isSuperAdmin();
 
       // /stores/{storeId}/categories/{categoryId}
       // Anyone can read categories.
       // Only the store owner can create, update, or delete categories.
       match /categories/{categoryId} {
         allow read: if true;
-        allow write: if isOwner(get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId);
+        allow write: if isStoreOwner(storeId) || isSuperAdmin();
       }
 
       // /stores/{storeId}/products/{productId}
@@ -52,7 +69,7 @@ service cloud.firestore {
       // Only the store owner can create, update, or delete products.
       match /products/{productId} {
         allow read: if true;
-        allow write: if isOwner(get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId);
+        allow write: if isStoreOwner(storeId) || isSuperAdmin();
       }
 
       // /stores/{storeId}/orders/{orderId}
@@ -60,7 +77,7 @@ service cloud.firestore {
       // Only the store owner can read, update, or delete orders.
       match /orders/{orderId} {
         allow create: if true;
-        allow read, update, delete: if isOwner(get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId);
+        allow read, update, delete: if isStoreOwner(storeId) || isSuperAdmin();
       }
 
       // /stores/{storeId}/customers/{customerId}
@@ -68,8 +85,46 @@ service cloud.firestore {
       // Only the store owner can read or delete customers.
       match /customers/{customerId} {
         allow create, update: if true;
-        allow read, delete: if isOwner(get(/databases/$(database)/documents/stores/$(storeId)).data.ownerId);
+        allow read, delete: if isStoreOwner(storeId) || isSuperAdmin();
       }
+    }
+
+    // /store_internal/{storeId}
+    // Datos internos solo para super admin
+    match /store_internal/{storeId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // /plans/{planId}
+    match /plans/{planId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // /payments/{paymentId}
+    match /payments/{paymentId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // /audit_logs/{logId}
+    match /audit_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    // /alerts/{alertId}
+    match /alerts/{alertId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // /system_config/{configId}
+    match /system_config/{configId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // /impersonation_sessions/{sessionId}
+    match /impersonation_sessions/{sessionId} {
+      allow read, write: if isSuperAdmin();
     }
   }
 }

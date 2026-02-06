@@ -116,6 +116,7 @@ export default function VerifyEmailPage() {
         if (!auth) return;
         
         try {
+            await fetch('/api/auth/session', { method: 'DELETE' });
             await signOut(auth);
             router.push('/login');
         } catch (error) {

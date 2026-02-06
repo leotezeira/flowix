@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUser, useFirestore } from '@/firebase';
+import { useUserProfile } from '@/hooks/use-user-profile';
 import { collection, query, where, getDocs, limit, addDoc, serverTimestamp, doc, updateDoc, Timestamp } from 'firebase/firestore';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,6 +36,7 @@ const formSchema = z.object({
 
 export default function AdminHubPage() {
   const { user, isLoading: isUserLoading } = useUser();
+  const { profile, isLoading: isProfileLoading } = useUserProfile();
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
@@ -46,7 +48,12 @@ export default function AdminHubPage() {
   });
 
   useEffect(() => {
-    if (isUserLoading || !user || !firestore) return;
+    if (isUserLoading || isProfileLoading || !user || !firestore) return;
+
+    if (profile?.role === 'super_admin') {
+      router.replace('/admin/superadmin');
+      return;
+    }
 
     const checkStore = async () => {
       try {
@@ -117,7 +124,7 @@ export default function AdminHubPage() {
     }
   }
 
-  if (loading || isUserLoading) {
+  if (loading || isUserLoading || isProfileLoading) {
     return <div className="flex h-screen items-center justify-center">Verificando información...</div>;
   }
 

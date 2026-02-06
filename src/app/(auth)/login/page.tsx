@@ -40,6 +40,17 @@ export default function LoginPage() {
         }
         try {
             await signInWithEmailAndPassword(auth, values.email, values.password);
+
+            const idToken = await auth.currentUser?.getIdToken();
+            if (idToken) {
+                await fetch('/api/auth/session', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${idToken}`,
+                    },
+                });
+            }
+
             router.push(`/admin`);
 
         } catch (error) {
