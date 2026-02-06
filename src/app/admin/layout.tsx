@@ -37,8 +37,12 @@ export default function AdminLayout({
 
   if (isLoading || !user || isSubscriptionLoading || isProfileLoading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div>Cargando...</div>
+      <div className="flex h-screen items-center justify-center flex-col gap-4">
+        <div className="flex flex-col items-center gap-2">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <p className="text-lg font-medium">Verificando información...</p>
+          <p className="text-sm text-muted-foreground">Por favor espera un momento</p>
+        </div>
       </div>
     );
   }

@@ -48,10 +48,14 @@ export default function AdminHubPage() {
   });
 
   useEffect(() => {
-    if (isUserLoading || isProfileLoading || !user || !firestore) return;
+    if (isUserLoading || !user || !firestore) {
+      // Aún está cargando
+      return;
+    }
 
+    // Usuario cargado, verificar si es super admin
     if (profile?.role === 'super_admin') {
-      router.replace('/admin/superadmin');
+      router.replace('/admin/superadmin/dashboard');
       return;
     }
 
@@ -71,13 +75,12 @@ export default function AdminHubPage() {
         }
       } catch (error) {
         console.error("Error checking for store:", error);
-        // Si hay error, permitir crear tienda
         setLoading(false);
       }
     };
 
     checkStore();
-  }, [user, isUserLoading, firestore, router]);
+  }, [user, isUserLoading, profile?.role, firestore, router]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     if (!user || !firestore) return;
