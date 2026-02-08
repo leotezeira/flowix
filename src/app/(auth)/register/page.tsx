@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { createUserWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendEmailVerification, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { FirebaseError } from "firebase/app";
 import { useAuth, useFirestore } from "@/firebase";
@@ -47,6 +47,9 @@ export default function RegisterPage() {
         }
 
         try {
+            // Configurar persistencia local para mantener al usuario logueado
+            await setPersistence(auth, browserLocalPersistence);
+            
             const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
             const user = userCredential.user;
 

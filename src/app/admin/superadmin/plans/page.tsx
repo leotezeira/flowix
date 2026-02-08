@@ -40,13 +40,13 @@ export default function SuperAdminPlansPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-3xl font-semibold">Gestión de Planes</h2>
-          <p className="text-muted-foreground">Administra los planes de suscripción disponibles.</p>
+          <h2 className="text-2xl sm:text-3xl font-semibold">Gestión de Planes</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">Administra los planes de suscripción disponibles.</p>
         </div>
-        <Button>
+        <Button className="w-full sm:w-auto">
           Crear Plan
         </Button>
       </div>
@@ -57,7 +57,7 @@ export default function SuperAdminPlansPage() {
         </Alert>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         {plans.map((plan) => (
           <Card key={plan.id}>
             <CardHeader>

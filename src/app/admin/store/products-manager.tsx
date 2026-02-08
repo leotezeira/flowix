@@ -279,7 +279,7 @@ export function ProductsManager({ storeId }: { storeId:string }) {
 
     return (
       <>
-        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:gap-8 grid-cols-1 lg:grid-cols-3">
             <div className="lg:col-span-1">
                 <Card>
                     <CardHeader>
@@ -442,6 +442,7 @@ export function ProductsManager({ storeId }: { storeId:string }) {
                         {isLoadingProducts ? (
                             <p>Cargando productos...</p>
                         ) : products && products.length > 0 ? (
+                            <div className="overflow-x-auto -mx-6 px-6">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -481,6 +482,7 @@ export function ProductsManager({ storeId }: { storeId:string }) {
                                     ))}
                                 </TableBody>
                             </Table>
+                            </div>
                         ) : (
                             <p>Todavía no has creado ningún producto.</p>
                         )}
@@ -729,7 +731,7 @@ function ProductEditDialog({ product, storeId, categories, products, onOpenChang
 
   return (
     <Dialog open={true} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar Producto</DialogTitle>
           <DialogDescription>Modificá la información del producto y sus variantes</DialogDescription>

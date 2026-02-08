@@ -58,10 +58,10 @@ export default function SuperAdminUsersPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h2 className="text-3xl font-semibold">Gestión de Usuarios</h2>
-        <p className="text-muted-foreground">Administra los usuarios de la plataforma.</p>
+        <h2 className="text-2xl sm:text-3xl font-semibold">Gestión de Usuarios</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">Administra los usuarios de la plataforma.</p>
       </div>
 
       {error && (
@@ -75,7 +75,7 @@ export default function SuperAdminUsersPage() {
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
             <div>
               <label className="text-sm font-medium">Buscar usuario</label>
               <Input

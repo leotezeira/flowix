@@ -62,10 +62,10 @@ export default function SuperAdminDashboardPage() {
     : [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h2 className="text-3xl font-semibold">Dashboard General</h2>
-        <p className="text-muted-foreground">Resumen global de la plataforma.</p>
+        <h2 className="text-2xl sm:text-3xl font-semibold">Dashboard General</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">Resumen global de la plataforma.</p>
       </div>
 
       {error && (
@@ -74,29 +74,29 @@ export default function SuperAdminDashboardPage() {
         </Alert>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardHeader>
             <CardDescription>Total de tiendas</CardDescription>
-            <CardTitle className="text-3xl">{data?.totalStores ?? '--'}</CardTitle>
+            <CardTitle className="text-2xl sm:text-3xl">{data?.totalStores ?? '--'}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader>
             <CardDescription>Tiendas activas</CardDescription>
-            <CardTitle className="text-3xl">{data?.activeStores ?? '--'}</CardTitle>
+            <CardTitle className="text-2xl sm:text-3xl">{data?.activeStores ?? '--'}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader>
             <CardDescription>Tiendas pagando</CardDescription>
-            <CardTitle className="text-3xl">{data?.payingStores ?? '--'}</CardTitle>
+            <CardTitle className="text-2xl sm:text-3xl">{data?.payingStores ?? '--'}</CardTitle>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader>
             <CardDescription>Ingresos estimados (mes)</CardDescription>
-            <CardTitle className="text-3xl">${data?.revenue.currentMonth ?? '--'}</CardTitle>
+            <CardTitle className="text-2xl sm:text-3xl">${data?.revenue.currentMonth ?? '--'}</CardTitle>
           </CardHeader>
         </Card>
       </div>

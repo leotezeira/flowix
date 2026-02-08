@@ -64,10 +64,10 @@ export default function SuperAdminStoresPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h2 className="text-3xl font-semibold">Gestión de Tiendas</h2>
-        <p className="text-muted-foreground">Administra todas las tiendas de la plataforma.</p>
+        <h2 className="text-2xl sm:text-3xl font-semibold">Gestión de Tiendas</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">Administra todas las tiendas de la plataforma.</p>
       </div>
 
       {error && (
@@ -81,7 +81,7 @@ export default function SuperAdminStoresPage() {
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <label className="text-sm font-medium">Buscar tienda</label>
               <Input

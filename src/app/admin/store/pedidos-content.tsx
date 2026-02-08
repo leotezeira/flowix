@@ -121,7 +121,7 @@ export function PedidosContent({ orders, resolveMillis }: PedidosContentProps) {
 
       {/* Order Detail Dialog */}
       <Dialog open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="w-[calc(100%-2rem)] max-w-2xl">
           <DialogHeader className="no-print">
             <DialogTitle>Detalle del pedido</DialogTitle>
           </DialogHeader>

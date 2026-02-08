@@ -33,28 +33,28 @@ export default function SuperAdminLayout({ children }: { children: React.ReactNo
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <div className="border-b bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-4 sm:px-6 py-4 flex-wrap">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Super Admin</p>
             <h1 className="text-xl font-semibold">Flowix Control Center</h1>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="text-right text-sm">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <div className="text-right text-sm hidden sm:block">
               <p className="font-medium">{profile?.displayName || profile?.email || 'Super Admin'}</p>
               <p className="text-muted-foreground">Acceso total</p>
             </div>
-            <Button variant="outline" onClick={handleLogout}>
+            <Button variant="outline" size="sm" onClick={handleLogout}>
               Cerrar sesion
             </Button>
           </div>
         </div>
       </div>
 
-      <div className="mx-auto grid max-w-7xl grid-cols-12 gap-6 px-6 py-8">
+      <div className="mx-auto grid max-w-7xl grid-cols-12 gap-4 sm:gap-6 px-4 sm:px-6 py-6 sm:py-8">
         <aside className="col-span-12 lg:col-span-3">
-          <nav className="flex flex-col gap-2 rounded-2xl border bg-white p-4 shadow-sm">
+          <nav className="flex flex-col gap-2 rounded-2xl border bg-white p-3 sm:p-4 shadow-sm">
             {navItems.map((item) => {
               const active = pathname === item.href;
               return (

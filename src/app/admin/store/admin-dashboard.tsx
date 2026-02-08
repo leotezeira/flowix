@@ -19,35 +19,35 @@ const dashboardCards: DashboardCard[] = [
     title: 'Productos',
     description: 'Gestiona tu catálogo de productos y categorías',
     icon: <Package className="w-8 h-8" />,
-    color: 'from-blue-500 to-cyan-500',
+    color: 'from-amber-500 to-yellow-400',
   },
   {
     id: 'pedidos',
     title: 'Pedidos',
     description: 'Visualiza y administra todos tus pedidos',
     icon: <ShoppingCart className="w-8 h-8" />,
-    color: 'from-green-500 to-emerald-500',
+    color: 'from-amber-600 to-yellow-500',
   },
   {
     id: 'usuario',
     title: 'Usuario',
     description: 'Actualiza tu información personal',
     icon: <User className="w-8 h-8" />,
-    color: 'from-purple-500 to-pink-500',
+    color: 'from-yellow-500 to-amber-400',
   },
   {
     id: 'suscripcion',
     title: 'Suscripción',
     description: 'Gestiona tu plan y estado de suscripción',
     icon: <CreditCard className="w-8 h-8" />,
-    color: 'from-amber-500 to-orange-500',
+    color: 'from-amber-500 to-amber-300',
   },
   {
     id: 'gestion',
     title: 'Gestión',
     description: 'Configura los datos de tu negocio y horarios',
     icon: <Settings className="w-8 h-8" />,
-    color: 'from-red-500 to-rose-500',
+    color: 'from-amber-700 to-yellow-500',
   },
 ];
 
@@ -65,8 +65,8 @@ export function AdminDashboard({ onSelectSection, stats }: AdminDashboardProps) 
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-4xl font-bold tracking-tight">Panel de Administración</h1>
-        <p className="text-lg text-muted-foreground mt-3">
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">Panel de Administración</h1>
+        <p className="text-base sm:text-lg text-muted-foreground mt-2 sm:mt-3">
           Selecciona una sección para comenzar a administrar tu tienda
         </p>
       </div>
@@ -80,13 +80,13 @@ export function AdminDashboard({ onSelectSection, stats }: AdminDashboardProps) 
             className="group h-full"
           >
             <Card className="h-full border-2 transition-all duration-300 hover:shadow-lg hover:border-primary cursor-pointer bg-gradient-to-br hover:scale-105">
-              <CardHeader className="space-y-3">
-                <div className={`inline-flex p-3 rounded-lg bg-gradient-to-br ${card.color} text-white w-fit transition-transform group-hover:scale-110`}>
+              <CardHeader className="space-y-3 items-center text-center">
+                <div className={`mx-auto inline-flex p-3 rounded-lg bg-gradient-to-br ${card.color} text-white w-fit transition-transform group-hover:scale-110`}>
                   {card.icon}
                 </div>
                 <CardTitle className="text-base leading-tight">{card.title}</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="text-center">
                 <CardDescription className="text-xs leading-relaxed">
                   {card.description}
                 </CardDescription>
@@ -98,7 +98,7 @@ export function AdminDashboard({ onSelectSection, stats }: AdminDashboardProps) 
 
       {/* Quick Stats */}
       {stats && (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">

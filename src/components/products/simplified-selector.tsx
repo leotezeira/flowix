@@ -30,6 +30,12 @@ export function SimpleVariantSelector({
 }: SimpleVariantSelectorProps) {
   const [selectedVariants, setSelectedVariants] = useState<VariantSelection>({});
 
+  const updateSelections = (nextSelections: VariantSelection) => {
+    setSelectedVariants(nextSelections);
+    const totalPrice = calculatePrice(nextSelections) - (product.basePrice || 0);
+    onConfirm(nextSelections, totalPrice);
+  };
+
   // Validar que todas las variantes obligatorias están seleccionadas
   const isValid = () => {
     for (const group of product.variants) {
@@ -44,9 +50,9 @@ export function SimpleVariantSelector({
   };
 
   // Calcular precio total con modificadores
-  const calculatePrice = () => {
+  const calculatePrice = (selections: VariantSelection = selectedVariants) => {
     let total = product.basePrice || 0;
-    for (const [groupId, optionIds] of Object.entries(selectedVariants)) {
+    for (const [groupId, optionIds] of Object.entries(selections)) {
       const group = product.variants.find((g) => g.id === groupId);
       if (group) {
         for (const optionId of optionIds) {
@@ -92,10 +98,11 @@ export function SimpleVariantSelector({
               group={group}
               selectedOptionId={selectedVariants[group.id]?.[0]}
               onSelect={(optionId) => {
-                setSelectedVariants({
+                const nextSelections = {
                   ...selectedVariants,
                   [group.id]: [optionId],
-                });
+                };
+                updateSelections(nextSelections);
               }}
             />
           ) : (
@@ -104,30 +111,15 @@ export function SimpleVariantSelector({
               group={group}
               selectedOptionIds={selectedVariants[group.id] || []}
               onToggle={(optionIds) => {
-                setSelectedVariants({
+                const nextSelections = {
                   ...selectedVariants,
                   [group.id]: optionIds,
-                });
+                };
+                updateSelections(nextSelections);
               }}
             />
           )
         )}
-        <div className="pt-2 text-sm">
-          <button
-            type="button"
-            onClick={() => {
-              if (!isValid()) {
-                alert('Completa todas las variantes obligatorias');
-                return;
-              }
-              const totalPrice = calculatePrice() - (product.basePrice || 0);
-              onConfirm(selectedVariants, totalPrice);
-            }}
-            className="w-full px-3 py-2 rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors text-sm"
-          >
-            Confirmar variantes
-          </button>
-        </div>
       </div>
     );
   }

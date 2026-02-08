@@ -8,13 +8,17 @@ import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 
 interface SystemConfig {
-  maintenanceMode: boolean;
-  maintenanceMessage: string;
-  registrationEnabled: boolean;
-  maxStoresPerUser: number;
-  trialDurationDays: number;
-  emailVerificationRequired: boolean;
-  updatedAt: string;
+  maintenanceMode?: boolean;
+  maintenanceMessage?: string;
+  registrationEnabled?: boolean;
+  maxStoresPerUser?: number;
+  trialDurationDays?: number;
+  emailVerificationRequired?: boolean;
+  favicon?: string;
+  landingHeroTitle?: string;
+  landingHeroSubtitle?: string;
+  landingTrialText?: string;
+  updatedAt?: string;
 }
 
 export default function SuperAdminSettingsPage() {
@@ -31,7 +35,19 @@ export default function SuperAdminSettingsPage() {
           throw new Error('No se pudo cargar la configuración');
         }
         const payload = await response.json();
-        setConfig(payload.config);
+        // Si no hay config, usar valores por defecto
+        setConfig(payload.config || {
+          maintenanceMode: false,
+          maintenanceMessage: 'Estamos realizando mantenimiento. Volvemos pronto.',
+          registrationEnabled: true,
+          maxStoresPerUser: 3,
+          trialDurationDays: 7,
+          emailVerificationRequired: false,
+          favicon: '',
+          landingHeroTitle: 'Tu carta online con pedidos por WhatsApp',
+          landingHeroSubtitle: 'Creá tu vidriera de productos en minutos, recibí pedidos directo a tu celular y olvidate de las comisiones para siempre.',
+          landingTrialText: 'Probá gratis 7 días. No se requiere tarjeta de crédito.',
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Error desconocido');
       }
@@ -45,7 +61,7 @@ export default function SuperAdminSettingsPage() {
     setIsSaving(true);
     try {
       const response = await fetch('/api/admin/system-config', {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
       });
@@ -78,10 +94,10 @@ export default function SuperAdminSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div>
-        <h2 className="text-3xl font-semibold">Configuración del Sistema</h2>
-        <p className="text-muted-foreground">Administra la configuración global de la plataforma.</p>
+        <h2 className="text-2xl sm:text-3xl font-semibold">Configuración del Sistema</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">Administra la configuración global de la plataforma.</p>
       </div>
 
       {error && (
@@ -94,6 +110,56 @@ export default function SuperAdminSettingsPage() {
         <>
           <Card>
             <CardHeader>
+              <CardTitle>Apariencia</CardTitle>
+              <CardDescription>Personaliza el favicon y textos principales</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="text-sm font-medium block mb-2">URL del Favicon</label>
+                <Input
+                  type="url"
+                  placeholder="https://ejemplo.com/favicon.ico"
+                  value={config.favicon || ''}
+                  onChange={(e) => setConfig({ ...config, favicon: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  URL pública del favicon (32x32 recomendado)
+                </p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium block mb-2">Título Hero Landing</label>
+                <Input
+                  value={config.landingHeroTitle || ''}
+                  onChange={(e) => setConfig({ ...config, landingHeroTitle: e.target.value })}
+                  placeholder="Tu carta online con pedidos por WhatsApp"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium block mb-2">Subtítulo Hero Landing</label>
+                <textarea
+                  value={config.landingHeroSubtitle || ''}
+                  onChange={(e) => setConfig({ ...config, landingHeroSubtitle: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-md"
+                  rows={2}
+                  placeholder="Creá tu vidriera de productos..."
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium block mb-2">Texto Trial Landing</label>
+                <Input
+                  value={config.landingTrialText || ''}
+                  onChange={(e) => setConfig({ ...config, landingTrialText: e.target.value })}
+                  placeholder="Probá gratis 7 días. No se requiere tarjeta de crédito."
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>Modo Mantenimiento</CardTitle>
               <CardDescription>Desactiva la plataforma para realizar mantenimiento</CardDescription>
             </CardHeader>
@@ -102,7 +168,7 @@ export default function SuperAdminSettingsPage() {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={config.maintenanceMode}
+                    checked={config.maintenanceMode || false}
                     onChange={(e) =>
                       setConfig({ ...config, maintenanceMode: e.target.checked })
                     }
@@ -118,7 +184,7 @@ export default function SuperAdminSettingsPage() {
                 <div>
                   <label className="text-sm font-medium block mb-2">Mensaje de Mantenimiento</label>
                   <textarea
-                    value={config.maintenanceMessage}
+                    value={config.maintenanceMessage || ''}
                     onChange={(e) =>
                       setConfig({ ...config, maintenanceMessage: e.target.value })
                     }
@@ -139,21 +205,21 @@ export default function SuperAdminSettingsPage() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={config.registrationEnabled}
+                  checked={config.registrationEnabled !== false}
                   onChange={(e) =>
                     setConfig({ ...config, registrationEnabled: e.target.checked })
                   }
                   className="w-4 h-4 rounded border-gray-300"
                 />
                 <span className="text-sm font-medium">
-                  {config.registrationEnabled ? 'Registro Habilitado' : 'Registro Deshabilitado'}
+                  {config.registrationEnabled !== false ? 'Registro Habilitado' : 'Registro Deshabilitado'}
                 </span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={config.emailVerificationRequired}
+                  checked={config.emailVerificationRequired || false}
                   onChange={(e) =>
                     setConfig({
                       ...config,
@@ -175,7 +241,7 @@ export default function SuperAdminSettingsPage() {
               <CardDescription>Configura los límites generales del sistema</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="text-sm font-medium block mb-2">
                     Máximo de Tiendas por Usuario
@@ -183,7 +249,7 @@ export default function SuperAdminSettingsPage() {
                   <Input
                     type="number"
                     min="1"
-                    value={config.maxStoresPerUser}
+                    value={config.maxStoresPerUser || 3}
                     onChange={(e) =>
                       setConfig({
                         ...config,
@@ -199,7 +265,7 @@ export default function SuperAdminSettingsPage() {
                   <Input
                     type="number"
                     min="1"
-                    value={config.trialDurationDays}
+                    value={config.trialDurationDays || 7}
                     onChange={(e) =>
                       setConfig({
                         ...config,

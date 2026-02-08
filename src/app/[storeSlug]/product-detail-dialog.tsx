@@ -49,7 +49,24 @@ export function ProductDetailDialog({
 
   if (!product) return null;
 
+  const hasMissingRequiredVariants = () => {
+    if (!product.variants || product.variants.length === 0) return false;
+    return product.variants.some((group) => {
+      if (group.type !== 'required') return false;
+      const selected = selectedVariants[group.id];
+      return !selected || selected.length === 0;
+    });
+  };
+
+  const warnMissingVariants = () => {
+    alert('Debes elegir las variantes obligatorias');
+  };
+
   const handleAddToCart = () => {
+    if (hasMissingRequiredVariants()) {
+      warnMissingVariants();
+      return;
+    }
     const cartItem: CartItem = {
       product,
       quantity: 1,
@@ -62,11 +79,19 @@ export function ProductDetailDialog({
   };
 
   const handleDirectOrder = () => {
+    if (hasMissingRequiredVariants()) {
+      warnMissingVariants();
+      return;
+    }
     setShowDirectOrderForm(true);
   };
 
   const handleConfirmDirectOrder = (values: DirectOrderFormValues) => {
     if (!storePhone) return;
+    if (hasMissingRequiredVariants()) {
+      warnMissingVariants();
+      return;
+    }
 
     const basePrice = product.basePrice || product.price;
     const totalPrice = basePrice + variantPrice;

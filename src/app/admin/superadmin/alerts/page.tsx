@@ -59,11 +59,11 @@ export default function SuperAdminAlertsPage() {
     : alerts;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-semibold">Alertas del Sistema</h2>
-          <p className="text-muted-foreground">Monitorea eventos importantes de la plataforma.</p>
+          <h2 className="text-2xl sm:text-3xl font-semibold">Alertas del Sistema</h2>
+          <p className="text-sm sm:text-base text-muted-foreground">Monitorea eventos importantes de la plataforma.</p>
         </div>
       </div>
 

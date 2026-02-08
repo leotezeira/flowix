@@ -267,12 +267,7 @@ export default function AdminStorePage() {
         store?.subscription?.status === 'active' ||
         (store?.subscription?.status === 'trialing' && trialEndsAt && Date.now() < trialEndsAt);
 
-    // Force subscription section if subscription is not active
-    useEffect(() => {
-        if (!isSubscriptionActive && activeSection !== 'suscripcion') {
-            setActiveSection('suscripcion');
-        }
-    }, [isSubscriptionActive, activeSection]);
+    // Keep dashboard as default entry even when subscription is inactive.
 
     // Handle payment return from Mercado Pago
     useEffect(() => {
@@ -482,7 +477,7 @@ export default function AdminStorePage() {
     if (activeSection === null) {
         // Dashboard Home View
         return (
-            <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-8 px-4">
+            <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-6 sm:py-8 px-4 overflow-x-hidden">
                 <div className="max-w-7xl mx-auto space-y-8">
                     {/* Header with store info */}
                     <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
@@ -517,13 +512,22 @@ export default function AdminStorePage() {
 
                     {/* Subscription warning */}
                     {blockUI && (
-                        <Card className="border-destructive/40 bg-destructive/5">
-                            <CardContent className="pt-6">
-                                <p className="text-sm text-destructive">
+                        <Card className="border-amber-200 bg-amber-50">
+                            <CardContent className="flex flex-col gap-3 pt-6 text-sm text-amber-900">
+                                <p className="font-semibold">Suscripción vencida</p>
+                                <p>
                                     {store?.subscription?.status === 'expired'
-                                        ? '⚠️ Tu período de prueba venció. Debes abonar para seguir utilizando el servicio.'
-                                        : '⚠️ Tu suscripción venció. Solo podés acceder a la sección de Suscripción.'}
+                                        ? 'Tu período de prueba venció. Debes abonar para seguir utilizando el servicio.'
+                                        : 'Tu suscripción está vencida. Solo podés acceder a la sección de Suscripción.'}
                                 </p>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-fit border-amber-300 text-amber-900 hover:bg-amber-100"
+                                    onClick={() => setActiveSection('suscripcion')}
+                                >
+                                    Ir a Suscripción
+                                </Button>
                             </CardContent>
                         </Card>
                     )}
@@ -544,7 +548,7 @@ export default function AdminStorePage() {
 
     // Section View with Sidebar
     return (
-        <div className="min-h-screen bg-gray-50 py-8 px-4">
+        <div className="min-h-screen bg-gray-50 py-6 sm:py-8 px-4 overflow-x-hidden">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
@@ -560,7 +564,7 @@ export default function AdminStorePage() {
                 </div>
 
                 {/* Main Layout: Sidebar + Content */}
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-4">
                     {/* Sidebar - Hidden on mobile, visible on lg */}
                     <div className="lg:col-span-1">
                         <AdminSidebar

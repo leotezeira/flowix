@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { signInWithEmailAndPassword, sendPasswordResetEmail, setPersistence, browserLocalPersistence, browserSessionPersistence } from "firebase/auth";
 import { FirebaseError } from "firebase/app";
 import { useAuth } from "@/firebase";
 import {
@@ -26,6 +26,7 @@ import {
 const formSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.string().min(1, "Contraseña requerida"),
+  rememberMe: z.boolean().default(false),
 });
 
 export default function LoginPage() {
@@ -38,7 +39,7 @@ export default function LoginPage() {
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
-        defaultValues: { email: "", password: "" },
+        defaultValues: { email: "", password: "", rememberMe: true },
     });
 
     async function handlePasswordReset() {
@@ -99,6 +100,10 @@ export default function LoginPage() {
             return;
         }
         try {
+            // Configurar persistencia según la opción "Recordarme"
+            const persistence = values.rememberMe ? browserLocalPersistence : browserSessionPersistence;
+            await setPersistence(auth, persistence);
+            
             await signInWithEmailAndPassword(auth, values.email, values.password);
 
             const idToken = await auth.currentUser?.getIdToken();
@@ -178,6 +183,27 @@ export default function LoginPage() {
                                   <Input type="password" required {...field} />
                                </FormControl>
                                <FormMessage />
+                          </FormItem>
+                      )}
+                  />
+                  <FormField
+                      control={form.control}
+                      name="rememberMe"
+                      render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                              <FormControl>
+                                  <input
+                                      type="checkbox"
+                                      checked={field.value}
+                                      onChange={field.onChange}
+                                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                  />
+                              </FormControl>
+                              <div className="space-y-1 leading-none">
+                                  <FormLabel className="text-sm font-normal cursor-pointer">
+                                      Recordarme en este dispositivo
+                                  </FormLabel>
+                              </div>
                           </FormItem>
                       )}
                   />

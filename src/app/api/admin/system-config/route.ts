@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ config: data });
 }
 
-export async function PATCH(request: NextRequest) {
+async function updateConfig(request: NextRequest) {
   const session = await requireSuperAdmin(request);
   if (!session) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -51,4 +51,12 @@ export async function PATCH(request: NextRequest) {
   });
 
   return NextResponse.json({ ok: true });
+}
+
+export async function PATCH(request: NextRequest) {
+  return updateConfig(request);
+}
+
+export async function PUT(request: NextRequest) {
+  return updateConfig(request);
 }

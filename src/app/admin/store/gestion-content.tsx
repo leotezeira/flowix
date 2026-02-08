@@ -61,7 +61,7 @@ export function GestionContent({
           <CardDescription>Configura la información principal de tu tienda</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium">Nombre del negocio</label>
               <Input

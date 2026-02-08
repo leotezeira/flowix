@@ -4,6 +4,7 @@ import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { DynamicFavicon } from '@/components/dynamic-favicon';
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -24,6 +25,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={cn('min-h-screen bg-background font-sans antialiased', poppins.variable)}>
+        <DynamicFavicon />
         <FirebaseClientProvider>
           {children}
         </FirebaseClientProvider>
