@@ -125,8 +125,8 @@ export default function AdminHubPage() {
             storeName: values.storeName,
             storeUrl,
             ownerName: user.displayName || 'Usuario',
-            // Si tienes un email admin, agrégalo aquí (opcional)
-            adminEmail: process.env.NEXT_PUBLIC_ADMIN_EMAIL,
+            // Notificación siempre a soporteflowix@gmail.com
+            adminEmail: 'soporteflowix@gmail.com',
           }),
         });
       } catch (emailError) {
