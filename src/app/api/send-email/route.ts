@@ -1,41 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// Para el email, usaremos Resend (gratuito) o un servicio similar
-// Por ahora, vamos a crear un endpoint que puede ser usado
-// En producción, necesitarías instalar resend: npm install resend
+import { sendEmail, getNewStoreEmailTemplate, getAdminNotificationEmailTemplate } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
-    try {
-        const { type, email, storeName } = await request.json();
+  try {
+    const { type, email, storeName, storeUrl, ownerName, adminEmail } = await request.json();
 
-        if (!email || !type) {
-            return NextResponse.json(
-                { error: 'Missing required fields' },
-                { status: 400 }
-            );
-        }
-
-        // Aquí iría la lógica de envío de emails
-        // Opciones gratuitas: Resend, SendGrid free tier, Mailgun, etc.
-        
-        if (type === 'store_deactivated') {
-            // Enviar email de desactivación
-            console.log(`Enviando email de desactivación a ${email} para tienda: ${storeName}`);
-            // await sendEmail({ to: email, subject: '... });
-        } else if (type === 'store_reactivated') {
-            // Enviar email de reactivación
-            console.log(`Enviando email de reactivación a ${email} para tienda: ${storeName}`);
-        }
-
-        return NextResponse.json({ 
-            success: true,
-            message: 'Email sent (en desarrollo)'
-        });
-    } catch (error) {
-        console.error('Error sending email:', error);
-        return NextResponse.json(
-            { error: 'Failed to send email', details: error instanceof Error ? error.message : String(error) },
-            { status: 500 }
-        );
+    if (!email || !type) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
     }
+
+    if (!process.env.RESEND_API_KEY) {
+      return NextResponse.json(
+        { error: 'Email service not configured' },
+        { status: 500 }
+      );
+    }
+
+    // Email de bienvenida al propietario de la tienda
+    if (type === 'store_created') {
+      if (!storeName || !storeUrl) {
+        return NextResponse.json(
+          { error: 'Missing storeName or storeUrl for store_created type' },
+          { status: 400 }
+        );
+      }
+
+      const html = getNewStoreEmailTemplate(storeName, email, storeUrl);
+      const result = await sendEmail({
+        to: email,
+        subject: `¡Tu tienda "${storeName}" ha sido creada en Flowix!`,
+        html,
+      });
+
+      if (!result.success) {
+        console.error('Failed to send welcome email:', result.error);
+        return NextResponse.json(
+          { error: 'Failed to send welcome email', details: result.error },
+          { status: 500 }
+        );
+      }
+
+      // También enviar notificación al admin si se proporciona
+      if (adminEmail) {
+        const adminHtml = getAdminNotificationEmailTemplate(storeName, email, ownerName);
+        await sendEmail({
+          to: adminEmail,
+          subject: `[NOTIFICACIÓN] Nueva tienda creada: ${storeName}`,
+          html: adminHtml,
+        });
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Email sent successfully',
+    });
+  } catch (error) {
+    console.error('Error sending email:', error);
+    return NextResponse.json(
+      {
+        error: 'Failed to send email',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    );
+  }
 }

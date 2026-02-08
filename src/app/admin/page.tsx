@@ -111,6 +111,29 @@ export default function AdminHubPage() {
         storeId: storeRef.id,
       });
 
+      // Enviar email de bienvenida al propietario
+      const frontendUrl = process.env.NEXT_PUBLIC_FRONTEND_URL || 'http://localhost:9002';
+      const storeUrl = `${frontendUrl}/admin/store/${storeSlug}`;
+      
+      try {
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'store_created',
+            email: user.email,
+            storeName: values.storeName,
+            storeUrl,
+            ownerName: user.displayName || 'Usuario',
+            // Si tienes un email admin, agrégalo aquí (opcional)
+            adminEmail: process.env.NEXT_PUBLIC_ADMIN_EMAIL,
+          }),
+        });
+      } catch (emailError) {
+        console.error('Error sending welcome email:', emailError);
+        // No interrumpir el flujo si el email falla
+      }
+
       toast({
         title: "¡Tienda creada!",
         description: "Tu tienda ha sido creada con éxito. Iniciaste tu período de prueba gratuito de 7 días.",
